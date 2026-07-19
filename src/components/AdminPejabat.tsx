@@ -151,8 +151,8 @@ export default function AdminPejabat({
     setSendingEmailId(id);
     setSentSuccessId(null);
 
-    const emailSubject = 'PIN Tanda Tangan Digital Resmi - Dinas PUPR Nagekeo';
-    const emailBody = `Yth. Bapak/Ibu ${name},\n\nBerikut adalah PIN Tanda Tangan Digital Anda untuk sistem SPPD & SPT Dinas Pekerjaan Umum dan Penataan Ruang (PUPR) Kabupaten Nagekeo:\n\nPIN ANDA: ${token}\n\nHarap simpan PIN ini dengan aman dan bersifat rahasia. PIN ini digunakan untuk melakukan tanda tangan digital (e-signature) pada dokumen SPPD, SPT, dan Kwitansi Pembayaran.\n\nTerima kasih.\nAdmin Dinas PUPR Kabupaten Nagekeo`;
+    const emailSubject = 'Akses Verifikasi Dokumen Dinas PUPR Nagekeo';
+    const emailBody = `Halo Bapak/Ibu ${name},\n\nTerima kasih telah bergabung dengan sistem administrasi SPPD & SPT Dinas Pekerjaan Umum dan Penataan Ruang (PUPR) Kabupaten Nagekeo.\n\nUntuk keperluan otorisasi dokumen dinas secara mandiri, berikut adalah kode verifikasi personal Anda:\n\nKODE VERIFIKASI: ${token}\n\nHarap simpan kode verifikasi ini dengan aman untuk digunakan setiap kali melakukan tanda tangan atau validasi dokumen SPPD & SPT.\n\nSalam,\nAdmin Dinas PUPR Kabupaten Nagekeo`;
 
     // Attempt to open the native mail client
     try {
@@ -542,7 +542,7 @@ export default function AdminPejabat({
                   <label className="text-4xs font-bold text-slate-500 uppercase tracking-wider">Isi Surat / Pesan Email:</label>
                   <button
                     onClick={() => handleCopyEmail(
-                      `Yth. Bapak/Ibu ${modalData.name},\n\nBerikut adalah PIN Tanda Tangan Digital Anda untuk sistem SPPD & SPT Dinas Pekerjaan Umum dan Penataan Ruang (PUPR) Kabupaten Nagekeo:\n\nPIN ANDA: ${modalData.pin}\n\nHarap simpan PIN ini dengan aman dan bersifat rahasia. PIN ini digunakan untuk melakukan tanda tangan digital (e-signature) pada dokumen SPPD, SPT, dan Kwitansi Pembayaran.\n\nTerima kasih.\nAdmin Dinas PUPR Kabupaten Nagekeo`
+                      `Halo Bapak/Ibu ${modalData.name},\n\nTerima kasih telah bergabung dengan sistem administrasi SPPD & SPT Dinas Pekerjaan Umum dan Penataan Ruang (PUPR) Kabupaten Nagekeo.\n\nUntuk keperluan otorisasi dokumen dinas secara mandiri, berikut adalah kode verifikasi personal Anda:\n\nKODE VERIFIKASI: ${modalData.pin}\n\nHarap simpan kode verifikasi ini dengan aman untuk digunakan setiap kali melakukan tanda tangan atau validasi dokumen SPPD & SPT.\n\nSalam,\nAdmin Dinas PUPR Kabupaten Nagekeo`
                     )}
                     className="text-4xs font-extrabold text-indigo-600 hover:text-indigo-800 transition"
                   >
@@ -553,11 +553,12 @@ export default function AdminPejabat({
                   readOnly
                   className="w-full h-32 px-3 py-2 text-3xs text-slate-600 border border-slate-200 rounded-xl bg-slate-50 focus:outline-hidden font-mono leading-relaxed resize-none"
                   value={
-                    `Yth. Bapak/Ibu ${modalData.name},\n\n` +
-                    `Berikut adalah PIN Tanda Tangan Digital Anda untuk sistem SPPD & SPT Dinas Pekerjaan Umum dan Penataan Ruang (PUPR) Kabupaten Nagekeo:\n\n` +
-                    `PIN ANDA: ${modalData.pin}\n\n` +
-                    `Harap simpan PIN ini dengan aman dan bersifat rahasia. PIN ini digunakan untuk melakukan tanda tangan digital (e-signature) pada dokumen SPPD, SPT, dan Kwitansi Pembayaran.\n\n` +
-                    `Terima kasih.\n` +
+                    `Halo Bapak/Ibu ${modalData.name},\n\n` +
+                    `Terima kasih telah bergabung dengan sistem administrasi SPPD & SPT Dinas Pekerjaan Umum dan Penataan Ruang (PUPR) Kabupaten Nagekeo.\n\n` +
+                    `Untuk keperluan otorisasi dokumen dinas secara mandiri, berikut adalah kode verifikasi personal Anda:\n\n` +
+                    `KODE VERIFIKASI: ${modalData.pin}\n\n` +
+                    `Harap simpan kode verifikasi ini dengan aman untuk digunakan setiap kali melakukan tanda tangan atau validasi dokumen SPPD & SPT.\n\n` +
+                    `Salam,\n` +
                     `Admin Dinas PUPR Kabupaten Nagekeo`
                   }
                 />
@@ -569,8 +570,8 @@ export default function AdminPejabat({
             <div className="bg-slate-50 px-6 py-4 border-t border-slate-100 flex gap-2 justify-end">
               <button
                 onClick={() => {
-                  const subject = 'PIN Tanda Tangan Digital Resmi - Dinas PUPR Nagekeo';
-                  const body = `Yth. Bapak/Ibu ${modalData.name},\n\nBerikut adalah PIN Tanda Tangan Digital Anda untuk sistem SPPD & SPT Dinas Pekerjaan Umum dan Penataan Ruang (PUPR) Kabupaten Nagekeo:\n\nPIN ANDA: ${modalData.pin}\n\nHarap simpan PIN ini dengan aman dan bersifat rahasia. PIN ini digunakan untuk melakukan tanda tangan digital (e-signature) pada dokumen SPPD, SPT, dan Kwitansi Pembayaran.\n\nTerima kasih.\nAdmin Dinas PUPR Kabupaten Nagekeo`;
+                  const subject = 'Akses Verifikasi Dokumen Dinas PUPR Nagekeo';
+                  const body = `Halo Bapak/Ibu ${modalData.name},\n\nTerima kasih telah bergabung dengan sistem administrasi SPPD & SPT Dinas Pekerjaan Umum dan Penataan Ruang (PUPR) Kabupaten Nagekeo.\n\nUntuk keperluan otorisasi dokumen dinas secara mandiri, berikut adalah kode verifikasi personal Anda:\n\nKODE VERIFIKASI: ${modalData.pin}\n\nHarap simpan kode verifikasi ini dengan aman untuk digunakan setiap kali melakukan tanda tangan atau validasi dokumen SPPD & SPT.\n\nSalam,\nAdmin Dinas PUPR Kabupaten Nagekeo`;
                   window.open(`mailto:${modalData.email}?subject=${encodeURIComponent(subject)}&body=${encodeURIComponent(body)}`, '_blank');
                 }}
                 className="px-4 py-2 bg-indigo-600 hover:bg-indigo-700 text-white font-extrabold text-xs rounded-xl shadow-xs transition"
