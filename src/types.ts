@@ -125,3 +125,16 @@ export interface DaftarBayarData {
   createdAt: string;
 }
 
+export interface PejabatStaff {
+  id: string;
+  nama: string;
+  nip: string;
+  pangkatGol: string;
+  jabatan: string;
+  email: string;
+  pin: string; // Secret signature PIN/token
+  status: 'Aktif' | 'Nonaktif';
+  createdAt: string;
+}
+
+

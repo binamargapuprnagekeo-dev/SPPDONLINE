@@ -19,12 +19,11 @@ export function calculateDocumentHash(data: any): string {
 }
 
 /**
- * Encrypts the digital signature payload using the admin PIN.
+ * Encrypts the digital signature payload using a PIN (defaults to admin PIN).
  */
-export function encryptSignature(payload: DecryptedSignaturePayload): string {
+export function encryptSignature(payload: DecryptedSignaturePayload, pin: string = ADMIN_PIN): string {
   const jsonString = JSON.stringify(payload);
-  // Encrypt with the standard admin PIN
-  return CryptoJS.AES.encrypt(jsonString, ADMIN_PIN).toString();
+  return CryptoJS.AES.encrypt(jsonString, pin).toString();
 }
 
 /**

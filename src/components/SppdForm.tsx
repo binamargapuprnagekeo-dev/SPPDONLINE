@@ -1,14 +1,15 @@
 import React, { useState, useEffect } from 'react';
-import { SppdData, Pengikut } from '../types';
-import { encryptSignature, calculateDocumentHash } from '../lib/crypto';
+import { SppdData, Pengikut, PejabatStaff } from '../types';
+import { encryptSignature, calculateDocumentHash, ADMIN_PIN } from '../lib/crypto';
 
 interface SppdFormProps {
   onSave: (data: SppdData) => void;
   onCancel: () => void;
   initialData?: SppdData;
+  pejabatList?: PejabatStaff[];
 }
 
-export default function SppdForm({ onSave, onCancel, initialData }: SppdFormProps) {
+export default function SppdForm({ onSave, onCancel, initialData, pejabatList = [] }: SppdFormProps) {
   const [nomor, setNomor] = useState(initialData?.nomor || '');
   const [penggunaAnggaran, setPenggunaAnggaran] = useState(initialData?.penggunaAnggaran || 'Kepala Dinas Pekerjaan Umum dan Penataan Ruang');
   const [namaPegawai, setNamaPegawai] = useState(initialData?.namaPegawai || '');
@@ -37,6 +38,28 @@ export default function SppdForm({ onSave, onCancel, initialData }: SppdFormProp
   const [penandatanganNama, setPenandatanganNama] = useState(initialData?.penandatanganNama || 'Syarifudin Ibrahim, ST');
   const [penandatanganPangkat, setPenandatanganPangkat] = useState(initialData?.penandatanganPangkat || 'Pembina Utama Muda');
   const [penandatanganNip, setPenandatanganNip] = useState(initialData?.penandatanganNip || 'NIP. 19681102 199703 1 008');
+
+  // Secure signature PIN states
+  const [selectedPejabatId, setSelectedPejabatId] = useState('');
+  const [signaturePin, setSignaturePin] = useState('');
+  const [pinError, setPinError] = useState('');
+
+  // Auto-fill penandatangan fields from registered list
+  useEffect(() => {
+    if (selectedPejabatId) {
+      if (selectedPejabatId === 'manual') {
+        // Keep current or allow typing
+      } else {
+        const found = pejabatList.find((p) => p.id === selectedPejabatId);
+        if (found) {
+          setPenandatanganNama(found.nama);
+          setPenandatanganPangkat(found.pangkatGol || 'Pembina Utama Muda');
+          setPenandatanganNip(found.nip.startsWith('NIP.') ? found.nip : `NIP. ${found.nip}`);
+          setPinError('');
+        }
+      }
+    }
+  }, [selectedPejabatId, pejabatList]);
 
   // Pengikut
   const [pengikut, setPengikut] = useState<Pengikut[]>(initialData?.pengikut || []);
@@ -87,6 +110,38 @@ export default function SppdForm({ onSave, onCancel, initialData }: SppdFormProp
 
     const id = initialData?.id || `SPPD-${Date.now()}-${Math.floor(1000 + Math.random() * 9000)}`;
 
+    // Find if the penandatangan is a registered official
+    let targetPin = ADMIN_PIN; // fallback is sppd2026
+    let isRegistered = false;
+
+    if (selectedPejabatId && selectedPejabatId !== 'manual') {
+      const found = pejabatList.find((p) => p.id === selectedPejabatId);
+      if (found) {
+        targetPin = found.pin;
+        isRegistered = true;
+      }
+    } else {
+      // Look up by name to be safe
+      const foundByName = pejabatList.find((p) => p.nama.toLowerCase().trim() === penandatanganNama.toLowerCase().trim());
+      if (foundByName) {
+        targetPin = foundByName.pin;
+        isRegistered = true;
+      }
+    }
+
+    // Verify PIN
+    if (!signaturePin) {
+      setPinError('Mohon masukkan PIN Otorisasi Tanda Tangan untuk mengesahkan dokumen!');
+      return;
+    }
+
+    if (signaturePin !== targetPin) {
+      setPinError(`PIN Otorisasi Tanda Tangan Salah! Dokumen GAGAL ditandatangani digital.`);
+      return;
+    }
+
+    setPinError('');
+
     const preliminaryData: Omit<SppdData, 'encryptedSignature'> = {
       id,
       nomor,
@@ -122,7 +177,7 @@ export default function SppdForm({ onSave, onCancel, initialData }: SppdFormProp
     // Calculate document integrity hash
     const hash = calculateDocumentHash(preliminaryData);
 
-    // Create encrypted digital signature payload
+    // Create encrypted digital signature payload using the unique official's PIN
     const encryptedSignature = encryptSignature({
       type: 'SPPD',
       docId: id,
@@ -137,7 +192,7 @@ export default function SppdForm({ onSave, onCancel, initialData }: SppdFormProp
         tanggalKembali,
       },
       hash,
-    });
+    }, signaturePin);
 
     const finalData: SppdData = {
       ...preliminaryData,
@@ -466,6 +521,30 @@ export default function SppdForm({ onSave, onCancel, initialData }: SppdFormProp
       <div className="bg-indigo-50/25 p-4 rounded-xl border border-indigo-100/50 space-y-4">
         <h4 className="text-sm font-bold text-gray-800 uppercase tracking-wider">Pengesahan / Penandatangan Surat</h4>
         
+        {pejabatList && pejabatList.length > 0 && (
+          <div className="space-y-1 bg-indigo-50/50 p-3 rounded-xl border border-indigo-100/30">
+            <label className="block text-xs font-bold text-slate-700 uppercase tracking-wider">
+              Pilih Pejabat Terdaftar (dari Google Sheet)
+            </label>
+            <select
+              value={selectedPejabatId}
+              onChange={(e) => setSelectedPejabatId(e.target.value)}
+              className="w-full px-3 py-1.5 bg-white border border-gray-300 rounded-lg text-xs"
+            >
+              <option value="">-- Pilih Pejabat atau Input Manual --</option>
+              {pejabatList.map((p) => (
+                <option key={p.id} value={p.id} disabled={p.status !== 'Aktif'}>
+                  {p.nama} - {p.jabatan} {p.status !== 'Aktif' ? '(Nonaktif)' : ''}
+                </option>
+              ))}
+              <option value="manual">Input Manual (Gunakan PIN Admin/Default)</option>
+            </select>
+            <p className="text-[10px] text-gray-500 italic mt-0.5">
+              Memilih pejabat terdaftar otomatis mengisi nama, pangkat, dan NIP.
+            </p>
+          </div>
+        )}
+
         <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
           <div>
             <label className="block text-xs font-semibold text-gray-700 mb-1">Dikeluarkan Di</label>
@@ -523,6 +602,35 @@ export default function SppdForm({ onSave, onCancel, initialData }: SppdFormProp
               id="input-sppd-pejabat-nip"
             />
           </div>
+        </div>
+
+        {/* Dynamic Digital PIN authentication field */}
+        <div className="bg-slate-50 border border-slate-200/60 p-3 rounded-xl space-y-1.5 mt-3">
+          <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-2">
+            <label className="block text-xs font-bold text-indigo-950 uppercase tracking-wider">
+              Masukkan PIN Otorisasi Tanda Tangan Digital *
+            </label>
+            <span className="text-[10px] text-slate-500 font-mono italic">
+              (Gunakan PIN {selectedPejabatId && selectedPejabatId !== 'manual' ? 'Pejabat' : 'Admin / PIN Default'})
+            </span>
+          </div>
+          <input
+            type="password"
+            maxLength={6}
+            value={signaturePin}
+            onChange={(e) => {
+              setSignaturePin(e.target.value.replace(/\D/g, ''));
+              setPinError('');
+            }}
+            placeholder="Ketik 6 digit PIN tanda tangan pejabat..."
+            className="w-full px-3 py-2 border border-indigo-300 rounded-xl bg-white font-mono font-bold text-center tracking-widest text-sm focus:ring-2 focus:ring-indigo-500 text-indigo-800"
+            required
+          />
+          {pinError && (
+            <div className="text-[11px] font-bold text-red-600 bg-red-50 border border-red-100 p-2 rounded-lg flex items-center gap-1">
+              ⚠️ {pinError}
+            </div>
+          )}
         </div>
       </div>
 

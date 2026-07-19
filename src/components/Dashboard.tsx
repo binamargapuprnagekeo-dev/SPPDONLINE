@@ -1,5 +1,5 @@
 import React, { useState, useEffect } from 'react';
-import { SppdData, SptData, SyncLog, DaftarBayarData } from '../types';
+import { SppdData, SptData, SyncLog, DaftarBayarData, PejabatStaff } from '../types';
 import {
   findSpreadsheet,
   createAndSetupSpreadsheet,
@@ -7,6 +7,8 @@ import {
   saveSptToSheet,
   loadSppdRecords,
   loadSptRecords,
+  savePejabatToSheet,
+  loadPejabatRecords,
 } from '../lib/sheets';
 import SppdForm from './SppdForm';
 import SptForm from './SptForm';
@@ -16,6 +18,8 @@ import DaftarBayarForm from './DaftarBayarForm';
 import DaftarBayarDocument from './DaftarBayarDocument';
 import InformasiStandar from './InformasiStandar';
 import BukuRegistrasi from './BukuRegistrasi';
+import InfoBanner from './InfoBanner';
+import AdminPejabat from './AdminPejabat';
 import NagekeoLogo from './NagekeoLogo';
 
 interface DashboardProps {
@@ -27,12 +31,13 @@ interface DashboardProps {
 
 export default function Dashboard({ user, accessToken, onLogin, onLogout }: DashboardProps) {
   // Navigation / Tabs
-  const [activeTab, setActiveTab] = useState<'sppd' | 'spt' | 'pembayaran' | 'registrasi' | 'standar' | 'logs'>('sppd');
+  const [activeTab, setActiveTab] = useState<'sppd' | 'spt' | 'pembayaran' | 'registrasi' | 'pejabat' | 'standar' | 'logs'>('sppd');
 
   // Document states (backed up in localStorage)
   const [sppdList, setSppdList] = useState<SppdData[]>([]);
   const [sptList, setSptList] = useState<SptData[]>([]);
   const [daftarBayarList, setDaftarBayarList] = useState<DaftarBayarData[]>([]);
+  const [pejabatList, setPejabatList] = useState<PejabatStaff[]>([]);
   const [syncLogs, setSyncLogs] = useState<SyncLog[]>([]);
 
   // Search & Filters
@@ -63,6 +68,7 @@ export default function Dashboard({ user, accessToken, onLogin, onLogout }: Dash
     const savedSppd = localStorage.getItem('sppd_records');
     const savedSpt = localStorage.getItem('spt_records');
     const savedDaftarBayar = localStorage.getItem('daftar_bayar_records');
+    const savedPejabat = localStorage.getItem('pejabat_records');
     const savedLogs = localStorage.getItem('sppd_sync_logs');
     const savedSheetId = localStorage.getItem('sppd_spreadsheet_id');
     const savedSheetUrl = localStorage.getItem('sppd_spreadsheet_url');
@@ -70,12 +76,18 @@ export default function Dashboard({ user, accessToken, onLogin, onLogout }: Dash
     if (savedSppd) setSppdList(JSON.parse(savedSppd));
     if (savedSpt) setSptList(JSON.parse(savedSpt));
     if (savedDaftarBayar) setDaftarBayarList(JSON.parse(savedDaftarBayar));
+    if (savedPejabat) setPejabatList(JSON.parse(savedPejabat));
     if (savedLogs) setSyncLogs(JSON.parse(savedLogs));
     if (savedSheetId) setSpreadsheetId(savedSheetId);
     if (savedSheetUrl) setSpreadsheetUrl(savedSheetUrl);
   }, []);
 
   // Save documents to localStorage when modified
+  const savePejabatListToStorage = (list: PejabatStaff[]) => {
+    setPejabatList(list);
+    localStorage.setItem('pejabat_records', JSON.stringify(list));
+  };
+
   const saveSppdListToStorage = (list: SppdData[]) => {
     setSppdList(list);
     localStorage.setItem('sppd_records', JSON.stringify(list));
@@ -140,6 +152,7 @@ export default function Dashboard({ user, accessToken, onLogin, onLogout }: Dash
         try {
           const sheetSppd = await loadSppdRecords(accessToken, sheetId);
           const sheetSpt = await loadSptRecords(accessToken, sheetId);
+          const sheetPejabat = await loadPejabatRecords(accessToken, sheetId);
           
           if (sheetSppd.length > 0) {
             // Merge with local records, prioritizing local ones if they aren't synced yet
@@ -167,6 +180,19 @@ export default function Dashboard({ user, accessToken, onLogin, onLogout }: Dash
               return merged;
             });
           }
+
+          if (sheetPejabat.length > 0) {
+            setPejabatList((prev) => {
+              const merged = [...prev];
+              sheetPejabat.forEach((item) => {
+                if (!merged.some((p) => p.id === item.id)) {
+                  merged.push(item);
+                }
+              });
+              localStorage.setItem('pejabat_records', JSON.stringify(merged));
+              return merged;
+            });
+          }
         } catch (loadErr) {
           console.warn('Failed to load past rows from sheet:', loadErr);
         }
@@ -185,6 +211,70 @@ export default function Dashboard({ user, accessToken, onLogin, onLogout }: Dash
     } finally {
       setIsSyncing(false);
     }
+  };
+
+  // Add Registered Pejabat / Staff
+  const handleAddPejabat = async (newPejabat: PejabatStaff) => {
+    const updated = [newPejabat, ...pejabatList];
+    savePejabatListToStorage(updated);
+
+    // Save to Google sheet immediately if connected
+    if (accessToken && spreadsheetId) {
+      setIsSyncing(true);
+      try {
+        await savePejabatToSheet(accessToken, spreadsheetId, newPejabat);
+        addSyncLog('sppd', newPejabat.id, newPejabat.nama, 'success', 'Berhasil mensinkronkan data Pejabat/Staf Baru ke Google Sheets.');
+      } catch (err: any) {
+        console.error(err);
+        addSyncLog('sppd', newPejabat.id, newPejabat.nama, 'failed', `Gagal sinkronisasi Pejabat ke Sheets: ${err.message}`);
+        throw err;
+      } finally {
+        setIsSyncing(false);
+      }
+    }
+  };
+
+  // Toggle active status
+  const handleTogglePejabatStatus = (id: string) => {
+    const updated = pejabatList.map((p) => {
+      if (p.id === id) {
+        return { ...p, status: (p.status === 'Aktif' ? 'Nonaktif' : 'Aktif') as 'Aktif' | 'Nonaktif' };
+      }
+      return p;
+    });
+    savePejabatListToStorage(updated);
+  };
+
+  // Update Registered Pejabat / Staff
+  const handleUpdatePejabat = async (updatedPejabat: PejabatStaff) => {
+    const updated = pejabatList.map((p) => (p.id === updatedPejabat.id ? updatedPejabat : p));
+    savePejabatListToStorage(updated);
+
+    // Sync with Google sheet if connected
+    if (accessToken && spreadsheetId) {
+      setIsSyncing(true);
+      try {
+        await savePejabatToSheet(accessToken, spreadsheetId, updatedPejabat);
+        addSyncLog('sppd', updatedPejabat.id, updatedPejabat.nama, 'success', 'Berhasil mensinkronkan pembaruan data Pejabat/Staf ke Google Sheets.');
+      } catch (err: any) {
+        console.error(err);
+        addSyncLog('sppd', updatedPejabat.id, updatedPejabat.nama, 'failed', `Gagal sinkronisasi update Pejabat ke Sheets: ${err.message}`);
+      } finally {
+        setIsSyncing(false);
+      }
+    }
+  };
+
+  // Delete Registered Pejabat / Staff (requires PIN 'sppd2026')
+  const handleDeletePejabat = (id: string) => {
+    const pin = window.prompt('Masukkan PIN Otorisasi (sppd2026) untuk menghapus Pejabat/Staf ini:');
+    if (pin !== 'sppd2026') {
+      alert('PIN Salah! Data Pejabat/Staf gagal dihapus.');
+      return;
+    }
+    const updated = pejabatList.filter((p) => p.id !== id);
+    savePejabatListToStorage(updated);
+    addSyncLog('sppd', id, 'Hapus Pejabat', 'success', 'Berhasil menghapus data Pejabat/Staf.');
   };
 
   // Create or Update SPPD Record
@@ -257,20 +347,24 @@ export default function Dashboard({ user, accessToken, onLogin, onLogout }: Dash
 
   // Delete SPPD
   const handleDeleteSppd = (id: string) => {
-    const confirmed = window.confirm('Apakah Anda yakin ingin menghapus data SPD ini dari daftar lokal?');
-    if (confirmed) {
-      const updated = sppdList.filter((p) => p.id !== id);
-      saveSppdListToStorage(updated);
+    const pin = window.prompt('Masukkan PIN Otorisasi (sppd2026) untuk menghapus data SPD ini:');
+    if (pin !== 'sppd2026') {
+      alert('PIN Salah! Data SPD gagal dihapus.');
+      return;
     }
+    const updated = sppdList.filter((p) => p.id !== id);
+    saveSppdListToStorage(updated);
   };
 
   // Delete SPT
   const handleDeleteSpt = (id: string) => {
-    const confirmed = window.confirm('Apakah Anda yakin ingin menghapus data SPT ini dari daftar lokal?');
-    if (confirmed) {
-      const updated = sptList.filter((p) => p.id !== id);
-      saveSptListToStorage(updated);
+    const pin = window.prompt('Masukkan PIN Otorisasi (sppd2026) untuk menghapus data SPT ini:');
+    if (pin !== 'sppd2026') {
+      alert('PIN Salah! Data SPT gagal dihapus.');
+      return;
     }
+    const updated = sptList.filter((p) => p.id !== id);
+    saveSptListToStorage(updated);
   };
 
   // Manual Sync helper for individual failed records
@@ -363,11 +457,13 @@ export default function Dashboard({ user, accessToken, onLogin, onLogout }: Dash
   };
 
   const handleDeleteDaftarBayar = (id: string) => {
-    const confirmed = window.confirm('Apakah Anda yakin ingin menghapus data rincian pembayaran ini?');
-    if (confirmed) {
-      const updated = daftarBayarList.filter((p) => p.id !== id);
-      saveDaftarBayarListToStorage(updated);
+    const pin = window.prompt('Masukkan PIN Otorisasi (sppd2026) untuk menghapus rincian pembayaran ini:');
+    if (pin !== 'sppd2026') {
+      alert('PIN Salah! Data rincian pembayaran gagal dihapus.');
+      return;
     }
+    const updated = daftarBayarList.filter((p) => p.id !== id);
+    saveDaftarBayarListToStorage(updated);
   };
 
   // Modal Render Selectors
@@ -393,6 +489,7 @@ export default function Dashboard({ user, accessToken, onLogin, onLogout }: Dash
             setEditingSppd(null);
           }}
           initialData={editingSppd || undefined}
+          pejabatList={pejabatList}
         />
       </div>
     );
@@ -408,6 +505,7 @@ export default function Dashboard({ user, accessToken, onLogin, onLogout }: Dash
             setEditingSpt(null);
           }}
           initialData={editingSpt || undefined}
+          pejabatList={pejabatList}
         />
       </div>
     );
@@ -552,6 +650,11 @@ export default function Dashboard({ user, accessToken, onLogin, onLogout }: Dash
       {/* Main Dashboard Layout */}
       <main className="flex-1 max-w-7xl w-full mx-auto px-4 sm:px-6 py-6 grid grid-cols-1 lg:grid-cols-4 gap-6">
         
+        {/* Ad Info Banner */}
+        <div className="lg:col-span-4 print:hidden">
+          <InfoBanner />
+        </div>
+        
         {/* Left column / Actions & Navigation Panel */}
         <div className="lg:col-span-1 space-y-4">
           
@@ -644,6 +747,18 @@ export default function Dashboard({ user, accessToken, onLogin, onLogout }: Dash
               </span>
             </button>
             <button
+              onClick={() => setActiveTab('pejabat')}
+              className={`w-full text-left px-4 py-2.5 rounded-xl text-xs sm:text-sm font-semibold transition flex items-center justify-between ${
+                activeTab === 'pejabat' ? 'bg-indigo-50 text-indigo-700' : 'text-gray-600 hover:bg-gray-50'
+              }`}
+              id="tab-pejabat"
+            >
+              <span>🔑 Registrasi Pejabat & PIN</span>
+              <span className="bg-indigo-100 text-indigo-800 font-bold font-mono px-1.5 py-0.5 rounded text-3xs">
+                {pejabatList.length}
+              </span>
+            </button>
+            <button
               onClick={() => setActiveTab('standar')}
               className={`w-full text-left px-4 py-2.5 rounded-xl text-xs sm:text-sm font-semibold transition flex items-center justify-between ${
                 activeTab === 'standar' ? 'bg-indigo-50 text-indigo-700' : 'text-gray-600 hover:bg-gray-50'
@@ -679,7 +794,7 @@ export default function Dashboard({ user, accessToken, onLogin, onLogout }: Dash
                 <strong>Tanda Tangan Digital Terenkripsi:</strong> Setiap dokumen yang dibuat secara otomatis menghasilkan string kriptografi AES yang unik.
               </p>
               <p>
-                Hanya admin dengan PIN <code className="bg-indigo-900 px-1 py-0.5 rounded text-white font-mono font-bold">sppd2026</code> yang dapat mendekripsi details di portal verifikasi.
+                Hanya admin dengan PIN otorisasi yang dapat mendekripsi rincian dokumen di portal verifikasi.
               </p>
               <p>
                 Ini menjamin bahwa SPD dan SPT tidak dapat dipalsukan, diedit secara ilegal, atau diduplikasi oleh pihak tidak bertanggung jawab.
@@ -1039,6 +1154,18 @@ export default function Dashboard({ user, accessToken, onLogin, onLogout }: Dash
               onPreviewSppd={(item) => setPreviewingSppd(item)}
               onPreviewSpt={(item) => setPreviewingSpt(item)}
               onPreviewDaftarBayar={(item) => setPreviewingDaftarBayar(item)}
+            />
+          )}
+
+          {/* Pejabat Registration & PIN management Tab Content */}
+          {activeTab === 'pejabat' && (
+            <AdminPejabat
+              pejabatList={pejabatList}
+              onAddPejabat={handleAddPejabat}
+              onUpdatePejabat={handleUpdatePejabat}
+              onDeletePejabat={handleDeletePejabat}
+              onToggleStatus={handleTogglePejabatStatus}
+              isSyncing={isSyncing}
             />
           )}
 

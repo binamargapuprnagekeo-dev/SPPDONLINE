@@ -84,10 +84,10 @@ export default function SignatureVerifier() {
             </span>
             <h2 className="text-xl sm:text-2xl font-black text-white">E-Signature Authenticator</h2>
             <p className="text-xs sm:text-sm text-slate-400">
-              Validasi dokumen dinas asli dengan mendekripsi digital signature QR Code menggunakan PIN Admin resmi.
+              Validasi dokumen dinas asli dengan mendekripsi digital signature QR Code menggunakan PIN Pejabat atau PIN Admin resmi.
             </p>
           </div>
-
+ 
           {!isVerified ? (
             <form onSubmit={handleVerify} className="space-y-5" id="form-verify-signature">
               {/* Encrypted Input Box */}
@@ -114,18 +114,18 @@ export default function SignatureVerifier() {
                   </div>
                 )}
               </div>
-
-              {/* Enter Admin PIN */}
+ 
+              {/* Enter PIN */}
               <div className="space-y-1.5">
                 <label className="block text-xs font-bold text-slate-400 uppercase tracking-widest">
-                  PIN Otorisasi Admin (PIN: sppd2026)
+                  PIN Tanda Tangan / PIN Otorisasi
                 </label>
                 <input
                   type="password"
                   value={pin}
                   onChange={(e) => setPin(e.target.value)}
                   className="w-full px-4 py-2.5 bg-slate-900 border border-slate-800 rounded-lg text-sm text-center text-white font-mono tracking-widest focus:ring-1 focus:ring-emerald-500 focus:outline-none focus:border-emerald-500"
-                  placeholder="••••••••"
+                  placeholder="••••••"
                   maxLength={12}
                   required
                   id="input-verify-pin"

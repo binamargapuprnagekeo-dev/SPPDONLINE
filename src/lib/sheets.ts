@@ -1,4 +1,4 @@
-import { SppdData, SptData } from '../types';
+import { SppdData, SptData, PejabatStaff } from '../types';
 import { calculateDocumentHash } from './crypto';
 
 const SPREADSHEET_TITLE = 'Aplikasi SPPD & SPT Nagekeo (Dinas PUPR)';
@@ -31,6 +31,11 @@ export async function createAndSetupSpreadsheet(accessToken: string): Promise<Sh
         {
           properties: {
             title: 'SPT',
+          },
+        },
+        {
+          properties: {
+            title: 'PEJABAT_STAFF',
           },
         },
       ],
@@ -107,6 +112,18 @@ async function initializeSheetHeaders(accessToken: string, spreadsheetId: string
     'Tamper Hash',
   ];
 
+  const pejabatHeaders = [
+    'ID',
+    'Nama',
+    'NIP',
+    'Pangkat/Gol',
+    'Jabatan',
+    'Email',
+    'PIN Signature',
+    'Status',
+    'Tanggal Terdaftar',
+  ];
+
   const response = await fetch(
     `https://sheets.googleapis.com/v4/spreadsheets/${spreadsheetId}/values:batchUpdate`,
     {
@@ -125,6 +142,10 @@ async function initializeSheetHeaders(accessToken: string, spreadsheetId: string
           {
             range: 'SPT!A1:R1',
             values: [sptHeaders],
+          },
+          {
+            range: 'PEJABAT_STAFF!A1:I1',
+            values: [pejabatHeaders],
           },
         ],
       }),
@@ -405,5 +426,170 @@ export async function loadSptRecords(accessToken: string, spreadsheetId: string)
       encryptedSignature: row[16] || '',
       syncStatus: 'synced',
     } as SptData;
+  });
+}
+
+/**
+ * Appends a Pejabat/Staff record to the PEJABAT_STAFF sheet.
+ */
+export async function savePejabatToSheet(
+  accessToken: string,
+  spreadsheetId: string,
+  data: PejabatStaff
+): Promise<void> {
+  const row = [
+    data.id,
+    data.nama,
+    data.nip,
+    data.pangkatGol,
+    data.jabatan,
+    data.email,
+    data.pin,
+    data.status,
+    data.createdAt,
+  ];
+
+  // Try to append. If sheet PEJABAT_STAFF doesn't exist, we can create it first or catch the error.
+  const response = await fetch(
+    `https://sheets.googleapis.com/v4/spreadsheets/${spreadsheetId}/values/PEJABAT_STAFF!A:A:append?valueInputOption=USER_ENTERED`,
+    {
+      method: 'POST',
+      headers: {
+        Authorization: `Bearer ${accessToken}`,
+        'Content-Type': 'application/json',
+      },
+      body: JSON.stringify({
+        range: 'PEJABAT_STAFF!A:A',
+        majorDimension: 'ROWS',
+        values: [row],
+      }),
+    }
+  );
+
+  if (!response.ok) {
+    const errText = await response.text();
+    // If the sheet doesn't exist, try creating it and try again
+    if (errText.includes('Unable to parse range') || errText.includes('not found') || errText.includes('Range')) {
+      await createPejabatSheet(accessToken, spreadsheetId);
+      // retry once
+      const retryResponse = await fetch(
+        `https://sheets.googleapis.com/v4/spreadsheets/${spreadsheetId}/values/PEJABAT_STAFF!A:A:append?valueInputOption=USER_ENTERED`,
+        {
+          method: 'POST',
+          headers: {
+            Authorization: `Bearer ${accessToken}`,
+            'Content-Type': 'application/json',
+          },
+          body: JSON.stringify({
+            range: 'PEJABAT_STAFF!A:A',
+            majorDimension: 'ROWS',
+            values: [row],
+          }),
+        }
+      );
+      if (!retryResponse.ok) {
+        throw new Error(`Failed to append Pejabat record after creating sheet: ${await retryResponse.text()}`);
+      }
+    } else {
+      throw new Error(`Failed to append Pejabat record: ${errText}`);
+    }
+  }
+}
+
+/**
+ * Creates the PEJABAT_STAFF sheet and adds its headers.
+ */
+export async function createPejabatSheet(accessToken: string, spreadsheetId: string): Promise<void> {
+  // First, add the sheet to the spreadsheet
+  const addSheetResponse = await fetch(
+    `https://sheets.googleapis.com/v4/spreadsheets/${spreadsheetId}:batchUpdate`,
+    {
+      method: 'POST',
+      headers: {
+        Authorization: `Bearer ${accessToken}`,
+        'Content-Type': 'application/json',
+      },
+      body: JSON.stringify({
+        requests: [
+          {
+            addSheet: {
+              properties: {
+                title: 'PEJABAT_STAFF',
+              },
+            },
+          },
+        ],
+      }),
+    }
+  );
+
+  if (!addSheetResponse.ok) {
+    // It might already exist, so ignore failure or log it
+    console.warn('Could not add PEJABAT_STAFF sheet, it might already exist.');
+  }
+
+  // Initialize headers
+  const headers = [
+    'ID',
+    'Nama',
+    'NIP',
+    'Pangkat/Gol',
+    'Jabatan',
+    'Email',
+    'PIN Signature',
+    'Status',
+    'Tanggal Terdaftar',
+  ];
+
+  await fetch(
+    `https://sheets.googleapis.com/v4/spreadsheets/${spreadsheetId}/values/PEJABAT_STAFF!A1:I1?valueInputOption=RAW`,
+    {
+      method: 'PUT',
+      headers: {
+        Authorization: `Bearer ${accessToken}`,
+        'Content-Type': 'application/json',
+      },
+      body: JSON.stringify({
+        range: 'PEJABAT_STAFF!A1:I1',
+        values: [headers],
+      }),
+    }
+  );
+}
+
+/**
+ * Fetches existing Pejabat/Staff rows from Google Sheets to sync with local state.
+ */
+export async function loadPejabatRecords(accessToken: string, spreadsheetId: string): Promise<PejabatStaff[]> {
+  const response = await fetch(
+    `https://sheets.googleapis.com/v4/spreadsheets/${spreadsheetId}/values/PEJABAT_STAFF!A2:I1000`,
+    {
+      headers: { Authorization: `Bearer ${accessToken}` },
+    }
+  );
+
+  if (!response.ok) {
+    const text = await response.text();
+    if (text.includes('Range not found') || text.includes('Unable to parse range') || text.includes('not found')) {
+      return [];
+    }
+    throw new Error(`Failed to fetch Pejabat rows: ${text}`);
+  }
+
+  const data = await response.json();
+  const rows = data.values || [];
+
+  return rows.map((row: any) => {
+    return {
+      id: row[0] || '',
+      nama: row[1] || '',
+      nip: row[2] || '',
+      pangkatGol: row[3] || '',
+      jabatan: row[4] || '',
+      email: row[5] || '',
+      pin: row[6] || '',
+      status: (row[7] as 'Aktif' | 'Nonaktif') || 'Aktif',
+      createdAt: row[8] || '',
+    } as PejabatStaff;
   });
 }
