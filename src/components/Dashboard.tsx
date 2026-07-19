@@ -9,6 +9,9 @@ import {
   loadSptRecords,
   savePejabatToSheet,
   loadPejabatRecords,
+  syncSppdListToSheet,
+  syncSptListToSheet,
+  syncPejabatListToSheet,
 } from '../lib/sheets';
 import SppdForm from './SppdForm';
 import SptForm from './SptForm';
@@ -222,7 +225,7 @@ export default function Dashboard({ user, accessToken, onLogin, onLogout }: Dash
     if (accessToken && spreadsheetId) {
       setIsSyncing(true);
       try {
-        await savePejabatToSheet(accessToken, spreadsheetId, newPejabat);
+        await syncPejabatListToSheet(accessToken, spreadsheetId, updated);
         addSyncLog('sppd', newPejabat.id, newPejabat.nama, 'success', 'Berhasil mensinkronkan data Pejabat/Staf Baru ke Google Sheets.');
       } catch (err: any) {
         console.error(err);
@@ -235,7 +238,7 @@ export default function Dashboard({ user, accessToken, onLogin, onLogout }: Dash
   };
 
   // Toggle active status
-  const handleTogglePejabatStatus = (id: string) => {
+  const handleTogglePejabatStatus = async (id: string) => {
     const updated = pejabatList.map((p) => {
       if (p.id === id) {
         return { ...p, status: (p.status === 'Aktif' ? 'Nonaktif' : 'Aktif') as 'Aktif' | 'Nonaktif' };
@@ -243,6 +246,20 @@ export default function Dashboard({ user, accessToken, onLogin, onLogout }: Dash
       return p;
     });
     savePejabatListToStorage(updated);
+
+    // Sync with Google sheet if connected
+    if (accessToken && spreadsheetId) {
+      setIsSyncing(true);
+      try {
+        await syncPejabatListToSheet(accessToken, spreadsheetId, updated);
+        addSyncLog('sppd', id, 'Status Berubah', 'success', 'Berhasil mensinkronkan status Pejabat/Staf ke Google Sheets.');
+      } catch (err: any) {
+        console.error(err);
+        addSyncLog('sppd', id, 'Status Berubah', 'failed', `Gagal sinkronisasi perubahan status ke Sheets: ${err.message}`);
+      } finally {
+        setIsSyncing(false);
+      }
+    }
   };
 
   // Update Registered Pejabat / Staff
@@ -254,7 +271,7 @@ export default function Dashboard({ user, accessToken, onLogin, onLogout }: Dash
     if (accessToken && spreadsheetId) {
       setIsSyncing(true);
       try {
-        await savePejabatToSheet(accessToken, spreadsheetId, updatedPejabat);
+        await syncPejabatListToSheet(accessToken, spreadsheetId, updated);
         addSyncLog('sppd', updatedPejabat.id, updatedPejabat.nama, 'success', 'Berhasil mensinkronkan pembaruan data Pejabat/Staf ke Google Sheets.');
       } catch (err: any) {
         console.error(err);
@@ -266,7 +283,7 @@ export default function Dashboard({ user, accessToken, onLogin, onLogout }: Dash
   };
 
   // Delete Registered Pejabat / Staff (requires PIN 'sppd2026')
-  const handleDeletePejabat = (id: string) => {
+  const handleDeletePejabat = async (id: string) => {
     const pin = window.prompt('Masukkan PIN Otorisasi Admin untuk menghapus Pejabat/Staf ini:');
     if (pin !== 'sppd2026') {
       alert('PIN Salah! Data Pejabat/Staf gagal dihapus.');
@@ -275,6 +292,20 @@ export default function Dashboard({ user, accessToken, onLogin, onLogout }: Dash
     const updated = pejabatList.filter((p) => p.id !== id);
     savePejabatListToStorage(updated);
     addSyncLog('sppd', id, 'Hapus Pejabat', 'success', 'Berhasil menghapus data Pejabat/Staf.');
+
+    // Sync deletion with Google Sheets if connected
+    if (accessToken && spreadsheetId) {
+      setIsSyncing(true);
+      try {
+        await syncPejabatListToSheet(accessToken, spreadsheetId, updated);
+        addSyncLog('sppd', id, 'Hapus Pejabat', 'success', 'Berhasil mensinkronkan penghapusan Pejabat/Staf ke Google Sheets.');
+      } catch (err: any) {
+        console.error(err);
+        addSyncLog('sppd', id, 'Hapus Pejabat', 'failed', `Gagal sinkronisasi hapus Pejabat ke Sheets: ${err.message}`);
+      } finally {
+        setIsSyncing(false);
+      }
+    }
   };
 
   // Create or Update SPPD Record
@@ -295,7 +326,7 @@ export default function Dashboard({ user, accessToken, onLogin, onLogout }: Dash
     // Trigger automatic sync with Google Sheet
     if (accessToken && spreadsheetId) {
       try {
-        await saveSppdToSheet(accessToken, spreadsheetId, data);
+        await syncSppdListToSheet(accessToken, spreadsheetId, updatedList);
         // Mark as synced
         const syncedList = updatedList.map((p) => (p.id === data.id ? { ...p, syncStatus: 'synced' as const } : p));
         saveSppdListToStorage(syncedList);
@@ -329,7 +360,7 @@ export default function Dashboard({ user, accessToken, onLogin, onLogout }: Dash
     // Trigger automatic sync with Google Sheet
     if (accessToken && spreadsheetId) {
       try {
-        await saveSptToSheet(accessToken, spreadsheetId, data);
+        await syncSptListToSheet(accessToken, spreadsheetId, updatedList);
         // Mark as synced
         const syncedList = updatedList.map((p) => (p.id === data.id ? { ...p, syncStatus: 'synced' as const } : p));
         saveSptListToStorage(syncedList);
@@ -346,7 +377,7 @@ export default function Dashboard({ user, accessToken, onLogin, onLogout }: Dash
   };
 
   // Delete SPPD
-  const handleDeleteSppd = (id: string) => {
+  const handleDeleteSppd = async (id: string) => {
     const pin = window.prompt('Masukkan PIN Otorisasi Admin untuk menghapus data SPD ini:');
     if (pin !== 'sppd2026') {
       alert('PIN Salah! Data SPD gagal dihapus.');
@@ -354,10 +385,25 @@ export default function Dashboard({ user, accessToken, onLogin, onLogout }: Dash
     }
     const updated = sppdList.filter((p) => p.id !== id);
     saveSppdListToStorage(updated);
+    addSyncLog('sppd', id, 'Hapus SPD', 'success', 'Berhasil menghapus data SPD dari penyimpanan lokal.');
+
+    // Sync deletion with Google Sheets if connected
+    if (accessToken && spreadsheetId) {
+      setIsSyncing(true);
+      try {
+        await syncSppdListToSheet(accessToken, spreadsheetId, updated);
+        addSyncLog('sppd', id, 'Hapus SPD', 'success', 'Berhasil mensinkronkan penghapusan data SPD ke Google Sheets.');
+      } catch (err: any) {
+        console.error(err);
+        addSyncLog('sppd', id, 'Hapus SPD', 'failed', `Gagal sinkronisasi hapus SPD ke Sheets: ${err.message}`);
+      } finally {
+        setIsSyncing(false);
+      }
+    }
   };
 
   // Delete SPT
-  const handleDeleteSpt = (id: string) => {
+  const handleDeleteSpt = async (id: string) => {
     const pin = window.prompt('Masukkan PIN Otorisasi Admin untuk menghapus data SPT ini:');
     if (pin !== 'sppd2026') {
       alert('PIN Salah! Data SPT gagal dihapus.');
@@ -365,6 +411,21 @@ export default function Dashboard({ user, accessToken, onLogin, onLogout }: Dash
     }
     const updated = sptList.filter((p) => p.id !== id);
     saveSptListToStorage(updated);
+    addSyncLog('spt', id, 'Hapus SPT', 'success', 'Berhasil menghapus data SPT dari penyimpanan lokal.');
+
+    // Sync deletion with Google Sheets if connected
+    if (accessToken && spreadsheetId) {
+      setIsSyncing(true);
+      try {
+        await syncSptListToSheet(accessToken, spreadsheetId, updated);
+        addSyncLog('spt', id, 'Hapus SPT', 'success', 'Berhasil mensinkronkan penghapusan data SPT ke Google Sheets.');
+      } catch (err: any) {
+        console.error(err);
+        addSyncLog('spt', id, 'Hapus SPT', 'failed', `Gagal sinkronisasi hapus SPT ke Sheets: ${err.message}`);
+      } finally {
+        setIsSyncing(false);
+      }
+    }
   };
 
   // Manual Sync helper for individual failed records
@@ -375,8 +436,8 @@ export default function Dashboard({ user, accessToken, onLogin, onLogout }: Dash
     }
     setIsSyncing(true);
     try {
-      await saveSppdToSheet(accessToken, spreadsheetId, data);
-      const syncedList = sppdList.map((p) => (p.id === data.id ? { ...p, syncStatus: 'synced' as const } : p));
+      await syncSppdListToSheet(accessToken, spreadsheetId, sppdList);
+      const syncedList = sppdList.map((p) => ({ ...p, syncStatus: 'synced' as const }));
       saveSppdListToStorage(syncedList);
       addSyncLog('sppd', data.id, data.nomor, 'success', 'Sinkronisasi manual SPD berhasil.');
       alert('SPD Berhasil disinkronkan ke Google Sheet!');
@@ -396,8 +457,8 @@ export default function Dashboard({ user, accessToken, onLogin, onLogout }: Dash
     }
     setIsSyncing(true);
     try {
-      await saveSptToSheet(accessToken, spreadsheetId, data);
-      const syncedList = sptList.map((p) => (p.id === data.id ? { ...p, syncStatus: 'synced' as const } : p));
+      await syncSptListToSheet(accessToken, spreadsheetId, sptList);
+      const syncedList = sptList.map((p) => ({ ...p, syncStatus: 'synced' as const }));
       saveSptListToStorage(syncedList);
       addSyncLog('spt', data.id, data.nomor, 'success', 'Sinkronisasi manual SPT berhasil.');
       alert('SPT Berhasil disinkronkan ke Google Sheet!');

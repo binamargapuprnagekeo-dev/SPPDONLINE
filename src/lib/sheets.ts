@@ -593,3 +593,221 @@ export async function loadPejabatRecords(accessToken: string, spreadsheetId: str
     } as PejabatStaff;
   });
 }
+
+/**
+ * Overwrites the SPPD sheet with the current complete list to ensure sync on updates and deletions.
+ */
+export async function syncSppdListToSheet(
+  accessToken: string,
+  spreadsheetId: string,
+  list: SppdData[]
+): Promise<void> {
+  const clearResponse = await fetch(
+    `https://sheets.googleapis.com/v4/spreadsheets/${spreadsheetId}/values/SPPD!A2:AA10000:clear`,
+    {
+      method: 'POST',
+      headers: {
+        Authorization: `Bearer ${accessToken}`,
+      },
+    }
+  );
+
+  if (!clearResponse.ok) {
+    const errText = await clearResponse.text();
+    throw new Error(`Failed to clear SPPD rows: ${errText}`);
+  }
+
+  if (list.length === 0) return;
+
+  const rows = list.map((data) => {
+    const hash = calculateDocumentHash(data);
+    return [
+      data.id,
+      data.nomor,
+      data.createdAt,
+      data.penggunaAnggaran,
+      data.namaPegawai,
+      data.nip,
+      data.pangkatGol,
+      data.jabatan,
+      data.tingkatPerjalanan,
+      data.maksudPerjalanan,
+      data.alatAngkutan,
+      data.tempatBerangkat,
+      data.tempatTujuan,
+      data.lamanyaPerjalanan,
+      data.tanggalBerangkat,
+      data.tanggalKembali,
+      data.pembebananAnggaran.instansi,
+      data.pembebananAnggaran.akun,
+      data.pembebananAnggaran.sumberDana,
+      data.keteranganLain,
+      data.dikeluarkanDi,
+      data.tanggalDikeluarkan,
+      data.penandatanganNama,
+      data.penandatanganPangkat,
+      data.penandatanganNip,
+      data.encryptedSignature,
+      hash,
+    ];
+  });
+
+  const response = await fetch(
+    `https://sheets.googleapis.com/v4/spreadsheets/${spreadsheetId}/values/SPPD!A2?valueInputOption=USER_ENTERED`,
+    {
+      method: 'PUT',
+      headers: {
+        Authorization: `Bearer ${accessToken}`,
+        'Content-Type': 'application/json',
+      },
+      body: JSON.stringify({
+        range: 'SPPD!A2',
+        majorDimension: 'ROWS',
+        values: rows,
+      }),
+    }
+  );
+
+  if (!response.ok) {
+    const errText = await response.text();
+    throw new Error(`Failed to write SPPD rows: ${errText}`);
+  }
+}
+
+/**
+ * Overwrites the SPT sheet with the current complete list to ensure sync on updates and deletions.
+ */
+export async function syncSptListToSheet(
+  accessToken: string,
+  spreadsheetId: string,
+  list: SptData[]
+): Promise<void> {
+  const clearResponse = await fetch(
+    `https://sheets.googleapis.com/v4/spreadsheets/${spreadsheetId}/values/SPT!A2:R10000:clear`,
+    {
+      method: 'POST',
+      headers: {
+        Authorization: `Bearer ${accessToken}`,
+      },
+    }
+  );
+
+  if (!clearResponse.ok) {
+    const errText = await clearResponse.text();
+    throw new Error(`Failed to clear SPT rows: ${errText}`);
+  }
+
+  if (list.length === 0) return;
+
+  const rows = list.map((data) => {
+    const hash = calculateDocumentHash(data);
+    const pegawaisFormatted = data.tugaskanKepada
+      .map((p, idx) => `${idx + 1}. ${p.nama} (NIP: ${p.nip}, Gol: ${p.pangkatGol}, Jabatan: ${p.jabatan})`)
+      .join('\n');
+
+    return [
+      data.id,
+      data.nomor,
+      data.createdAt,
+      data.dasar,
+      pegawaisFormatted,
+      data.keperluan,
+      data.tempatTujuan,
+      data.tanggalBerangkat,
+      data.tanggalKembali,
+      data.alatAngkut,
+      data.pembebananAnggaran,
+      data.ditetapkanDi,
+      data.tanggalDitetapkan,
+      data.penandatanganNama,
+      data.penandatanganPangkat,
+      data.penandatanganNip,
+      data.encryptedSignature,
+      hash,
+    ];
+  });
+
+  const response = await fetch(
+    `https://sheets.googleapis.com/v4/spreadsheets/${spreadsheetId}/values/SPT!A2?valueInputOption=USER_ENTERED`,
+    {
+      method: 'PUT',
+      headers: {
+        Authorization: `Bearer ${accessToken}`,
+        'Content-Type': 'application/json',
+      },
+      body: JSON.stringify({
+        range: 'SPT!A2',
+        majorDimension: 'ROWS',
+        values: rows,
+      }),
+    }
+  );
+
+  if (!response.ok) {
+    const errText = await response.text();
+    throw new Error(`Failed to write SPT rows: ${errText}`);
+  }
+}
+
+/**
+ * Overwrites the PEJABAT_STAFF sheet with the current complete list to ensure sync on updates and deletions.
+ */
+export async function syncPejabatListToSheet(
+  accessToken: string,
+  spreadsheetId: string,
+  list: PejabatStaff[]
+): Promise<void> {
+  const clearResponse = await fetch(
+    `https://sheets.googleapis.com/v4/spreadsheets/${spreadsheetId}/values/PEJABAT_STAFF!A2:I10000:clear`,
+    {
+      method: 'POST',
+      headers: {
+        Authorization: `Bearer ${accessToken}`,
+      },
+    }
+  );
+
+  if (!clearResponse.ok) {
+    const errText = await clearResponse.text();
+    if (errText.includes('Unable to parse range') || errText.includes('not found') || errText.includes('Range')) {
+      await createPejabatSheet(accessToken, spreadsheetId);
+    } else {
+      throw new Error(`Failed to clear PEJABAT_STAFF rows: ${errText}`);
+    }
+  }
+
+  if (list.length === 0) return;
+
+  const rows = list.map((data) => [
+    data.id,
+    data.nama,
+    data.nip,
+    data.pangkatGol,
+    data.jabatan,
+    data.email,
+    data.pin,
+    data.status,
+    data.createdAt,
+  ]);
+
+  const response = await fetch(
+    `https://sheets.googleapis.com/v4/spreadsheets/${spreadsheetId}/values/PEJABAT_STAFF!A2?valueInputOption=USER_ENTERED`,
+    {
+      method: 'PUT',
+      headers: {
+        Authorization: `Bearer ${accessToken}`,
+        'Content-Type': 'application/json',
+      },
+      body: JSON.stringify({
+        range: 'PEJABAT_STAFF!A2',
+        majorDimension: 'ROWS',
+        values: rows,
+      }),
+    }
+  );
+
+  if (!response.ok) {
+    const errText = await response.text();
+    throw new Error(`Failed to write PEJABAT_STAFF rows: ${errText}`);
+  }
+}
