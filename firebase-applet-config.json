@@ -6,6 +6,6 @@
   "storageBucket": "sppdonline-62441.firebasestorage.app",
   "messagingSenderId": "458956390424",
   "measurementId": "G-PPVQG5HZHQ",
-  "oAuthClientId": "458956390424-2lq6b10f018dn1qj0g78n9q5jhn0arve.apps.googleusercontent.com",
-  
+  "oAuthClientId": "",
+  "recaptchaSiteKey": ""
 }
