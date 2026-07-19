@@ -1,0 +1,257 @@
+import React, { useState, useEffect } from 'react';
+import { decryptSignature } from '../lib/crypto';
+import { DecryptedSignaturePayload } from '../types';
+import NagekeoLogo from './NagekeoLogo';
+
+export default function SignatureVerifier() {
+  const [encryptedData, setEncryptedData] = useState('');
+  const [pin, setPin] = useState('');
+  const [decryptedPayload, setDecryptedPayload] = useState<DecryptedSignaturePayload | null>(null);
+  const [error, setError] = useState('');
+  const [isVerified, setIsVerified] = useState(false);
+
+  // Auto-load from URL query parameters if available
+  useEffect(() => {
+    const params = new URLSearchParams(window.location.search);
+    const dataParam = params.get('data');
+    if (dataParam) {
+      setEncryptedData(dataParam);
+    }
+  }, []);
+
+  const handleVerify = (e: React.FormEvent) => {
+    e.preventDefault();
+    setError('');
+    setDecryptedPayload(null);
+    setIsVerified(false);
+
+    if (!encryptedData) {
+      setError('Mohon masukkan kode tanda tangan digital terenkripsi.');
+      return;
+    }
+
+    if (!pin) {
+      setError('Mohon masukkan PIN Admin.');
+      return;
+    }
+
+    const decrypted = decryptSignature(encryptedData, pin);
+    if (decrypted) {
+      setDecryptedPayload(decrypted);
+      setIsVerified(true);
+    } else {
+      setError('PIN Salah atau Data Tanda Tangan tidak valid / telah dirubah!');
+    }
+  };
+
+  const handleClear = () => {
+    setEncryptedData('');
+    setPin('');
+    setDecryptedPayload(null);
+    setError('');
+    setIsVerified(false);
+    // Clear URL parameters
+    window.history.replaceState({}, document.title, window.location.pathname);
+  };
+
+  return (
+    <div className="min-h-screen bg-slate-900 text-slate-100 flex flex-col justify-between" id="verifier-page">
+      {/* Navbar / Top Bar */}
+      <header className="border-b border-slate-800 bg-slate-950/80 backdrop-blur-md sticky top-0 z-50 px-4 py-3 sm:px-6">
+        <div className="max-w-5xl mx-auto flex items-center justify-between">
+          <div className="flex items-center gap-3">
+            <NagekeoLogo size={42} />
+            <div>
+              <h1 className="text-sm font-bold tracking-wider uppercase text-white">E-SPPD Kabupaten Nagekeo</h1>
+              <p className="text-3xs text-emerald-400 font-mono tracking-widest">PORTAL VERIFIKASI DIGITAL</p>
+            </div>
+          </div>
+          <a
+            href="/"
+            className="px-3 py-1.5 bg-slate-800 hover:bg-slate-700 text-slate-300 hover:text-white rounded-lg text-xs font-semibold transition"
+          >
+            Kembali ke Dashboard
+          </a>
+        </div>
+      </header>
+
+      {/* Main Content Area */}
+      <main className="flex-1 max-w-2xl w-full mx-auto p-4 sm:p-6 flex flex-col justify-center">
+        <div className="bg-slate-950 border border-slate-800 rounded-2xl p-5 sm:p-8 shadow-2xl space-y-6">
+          <div className="text-center space-y-2 border-b border-slate-800 pb-5">
+            <span className="px-3 py-1 bg-emerald-500/10 border border-emerald-500/30 text-emerald-400 rounded-full text-3xs font-mono font-semibold tracking-wider uppercase">
+              Tanda Tangan Digital PUPR Nagekeo
+            </span>
+            <h2 className="text-xl sm:text-2xl font-black text-white">E-Signature Authenticator</h2>
+            <p className="text-xs sm:text-sm text-slate-400">
+              Validasi dokumen dinas asli dengan mendekripsi digital signature QR Code menggunakan PIN Admin resmi.
+            </p>
+          </div>
+
+          {!isVerified ? (
+            <form onSubmit={handleVerify} className="space-y-5" id="form-verify-signature">
+              {/* Encrypted Input Box */}
+              <div className="space-y-1.5">
+                <label className="block text-xs font-bold text-slate-400 uppercase tracking-widest">
+                  Payload Digital Signature (Terenkripsi)
+                </label>
+                {encryptedData ? (
+                  <div className="p-3 bg-slate-900 border border-emerald-500/30 text-slate-200 rounded-lg text-xs font-mono break-all max-h-32 overflow-y-auto relative">
+                    <span className="absolute top-1.5 right-1.5 bg-emerald-500/20 text-emerald-300 text-3xs px-1.5 py-0.5 rounded font-bold uppercase tracking-wider">
+                      Terbaca
+                    </span>
+                    {encryptedData}
+                  </div>
+                ) : (
+                  <div>
+                    <textarea
+                      value={encryptedData}
+                      onChange={(e) => setEncryptedData(e.target.value)}
+                      className="w-full p-3 bg-slate-900 border border-slate-800 rounded-lg text-xs text-slate-200 font-mono focus:ring-1 focus:ring-emerald-500 focus:outline-none focus:border-emerald-500"
+                      rows={4}
+                      placeholder="Tempelkan block text enkripsi di sini atau pindai kode QR Surat Dinas..."
+                    />
+                  </div>
+                )}
+              </div>
+
+              {/* Enter Admin PIN */}
+              <div className="space-y-1.5">
+                <label className="block text-xs font-bold text-slate-400 uppercase tracking-widest">
+                  PIN Otorisasi Admin (PIN: sppd2026)
+                </label>
+                <input
+                  type="password"
+                  value={pin}
+                  onChange={(e) => setPin(e.target.value)}
+                  className="w-full px-4 py-2.5 bg-slate-900 border border-slate-800 rounded-lg text-sm text-center text-white font-mono tracking-widest focus:ring-1 focus:ring-emerald-500 focus:outline-none focus:border-emerald-500"
+                  placeholder="••••••••"
+                  maxLength={12}
+                  required
+                  id="input-verify-pin"
+                />
+              </div>
+
+              {/* Error Message */}
+              {error && (
+                <div className="p-3 bg-red-500/10 border border-red-500/20 text-red-400 rounded-lg text-xs font-semibold text-center" id="verify-error-msg">
+                  ⚠️ {error}
+                </div>
+              )}
+
+              {/* Action Buttons */}
+              <div className="flex gap-2 pt-2">
+                {encryptedData && (
+                  <button
+                    type="button"
+                    onClick={handleClear}
+                    className="px-4 py-2 bg-slate-800 hover:bg-slate-700 text-slate-300 rounded-lg text-xs font-bold transition"
+                  >
+                    Reset Input
+                  </button>
+                )}
+                <button
+                  type="submit"
+                  className="flex-1 py-2.5 bg-emerald-600 hover:bg-emerald-500 text-white font-bold rounded-lg text-sm transition shadow-lg shadow-emerald-900/30 flex items-center justify-center gap-2"
+                  id="btn-verify-submit"
+                >
+                  <svg xmlns="http://www.w3.org/2000/svg" className="h-4 w-4" viewBox="0 0 20 20" fill="currentColor">
+                    <path fillRule="evenodd" d="M2.166 4.9L10 1.154l7.834 3.746A1 1 0 0118.5 5.8v4.2c0 5.545-4.42 8.767-8.166 9.873a1 1 0 01-.668 0C5.92 18.767 1.5 15.545 1.5 10V5.8a1 1 0 01.666-.9zM10 3.154L3.5 6.262v3.938c0 4.544 3.486 7.158 6.5 8.16 3.014-1.002 6.5-3.616 6.5-8.16V6.262L10 3.154zm1.293 6.139a1 1 0 010 1.414l-3 3a1 1 0 01-1.414 0l-1.5-1.5a1 1 0 111.414-1.414L8 11.586l2.293-2.293a1 1 0 011.414 0z" clipRule="evenodd" />
+                  </svg>
+                  Buka Dekripsi & Validasi
+                </button>
+              </div>
+            </form>
+          ) : (
+            // Decrypted Verification Result
+            <div className="space-y-5 animate-fade-in" id="decrypted-result">
+              {/* Authentic Status */}
+              <div className="p-4 bg-emerald-500/10 border border-emerald-500/30 text-emerald-400 rounded-xl text-center space-y-1">
+                <span className="text-2xl">✅</span>
+                <h3 className="text-lg font-black text-white">TANDA TANGAN DIGITAL VALID & ASLI</h3>
+                <p className="text-2xs sm:text-xs text-emerald-400/90 max-w-sm mx-auto">
+                  Diverifikasi secara kriptografis oleh Dinas Pekerjaan Umum dan Penataan Ruang Kab. Nagekeo.
+                </p>
+              </div>
+
+              {/* Document Metadata Details */}
+              <div className="bg-slate-900 border border-slate-800 rounded-xl p-4 sm:p-5 space-y-3.5 text-xs sm:text-sm">
+                <div className="flex justify-between items-center border-b border-slate-800 pb-2">
+                  <span className="font-bold text-slate-400">Jenis Dokumen</span>
+                  <span className="px-2.5 py-0.5 bg-indigo-500/20 text-indigo-300 rounded font-bold font-mono uppercase tracking-wider text-2xs">
+                    {decryptedPayload?.type}
+                  </span>
+                </div>
+
+                <div className="flex justify-between items-start border-b border-slate-800 pb-2 gap-2">
+                  <span className="font-bold text-slate-400 whitespace-nowrap">ID Register</span>
+                  <span className="font-mono text-slate-200 text-right break-all">{decryptedPayload?.docId}</span>
+                </div>
+
+                <div className="flex justify-between items-center border-b border-slate-800 pb-2">
+                  <span className="font-bold text-slate-400">Nomor Surat</span>
+                  <span className="font-semibold text-slate-200 text-right">{decryptedPayload?.nomor}</span>
+                </div>
+
+                <div className="flex justify-between items-center border-b border-slate-800 pb-2">
+                  <span className="font-bold text-slate-400">Nama Pegawai</span>
+                  <span className="font-semibold text-emerald-300 text-right">{decryptedPayload?.details?.namaPegawai}</span>
+                </div>
+
+                <div className="flex justify-between items-start border-b border-slate-800 pb-2 gap-2">
+                  <span className="font-bold text-slate-400 whitespace-nowrap">Keperluan</span>
+                  <span className="text-slate-300 text-right italic">{decryptedPayload?.details?.keperluan}</span>
+                </div>
+
+                <div className="flex justify-between items-center border-b border-slate-800 pb-2">
+                  <span className="font-bold text-slate-400">Tempat Tujuan</span>
+                  <span className="font-semibold text-slate-200 text-right">{decryptedPayload?.details?.tempatTujuan}</span>
+                </div>
+
+                <div className="flex justify-between items-center border-b border-slate-800 pb-2">
+                  <span className="font-bold text-slate-400">Periode Tugas</span>
+                  <span className="font-semibold text-slate-200 text-right">
+                    {decryptedPayload?.details?.tanggalBerangkat} s/d {decryptedPayload?.details?.tanggalKembali}
+                  </span>
+                </div>
+
+                <div className="flex justify-between items-center border-b border-slate-800 pb-2">
+                  <span className="font-bold text-slate-400">Penandatangan</span>
+                  <span className="font-semibold text-slate-200 text-right">{decryptedPayload?.signedBy}</span>
+                </div>
+
+                <div className="flex justify-between items-center border-b border-slate-800 pb-2">
+                  <span className="font-bold text-slate-400">Tgl Penandatanganan</span>
+                  <span className="font-semibold text-slate-200 text-right">{decryptedPayload?.signedDate}</span>
+                </div>
+
+                <div className="flex justify-between items-start pt-1 gap-2">
+                  <span className="font-bold text-slate-400 whitespace-nowrap">Integritas Hash (SHA256)</span>
+                  <span className="font-mono text-3xs text-slate-500 break-all text-right">{decryptedPayload?.hash}</span>
+                </div>
+              </div>
+
+              {/* Return Button */}
+              <div className="flex gap-2">
+                <button
+                  type="button"
+                  onClick={handleClear}
+                  className="w-full py-2 bg-slate-800 hover:bg-slate-700 text-slate-300 font-bold rounded-lg text-xs transition"
+                >
+                  Selesai & Verifikasi Dokumen Lain
+                </button>
+              </div>
+            </div>
+          )}
+        </div>
+      </main>
+
+      {/* Footer Area */}
+      <footer className="border-t border-slate-800 bg-slate-950 px-4 py-4 text-center text-3xs text-slate-500 font-mono">
+        &copy; 2026 Dinas Pekerjaan Umum dan Penataan Ruang Kab. Nagekeo. All Rights Reserved.
+        <br />
+        Dibuat untuk penjaminan keaslian administrasi dan efisiensi perjalanan dinas daerah.
+      </footer>
+    </div>
+  );
+}

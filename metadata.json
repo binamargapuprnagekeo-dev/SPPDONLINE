@@ -1,0 +1,6 @@
+{
+  "name": "Aplikasi SPPD Nagekeo",
+  "description": "Sistem Informasi Surat Perjalanan Dinas (SPPD) dan Surat Perintah Tugas (SPT) Dinas PUPR Kabupaten Nagekeo dengan Tanda Tangan Digital QR Code Terenkripsi dan Sinkronisasi Google Sheets.",
+  "requestFramePermissions": ["camera"],
+  "majorCapabilities": ["MAJOR_CAPABILITY_SERVER_SIDE_GEMINI_API"]
+}
