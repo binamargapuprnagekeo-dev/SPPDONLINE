@@ -29,9 +29,29 @@ export default function AdminPejabat({
   const [editingPejabat, setEditingPejabat] = useState<PejabatStaff | null>(null);
   const [showPinInput, setShowPinInput] = useState(false);
 
-  // Email sending animation states
+  // Email sending and modal helper states
   const [sendingEmailId, setSendingEmailId] = useState<string | null>(null);
   const [sentSuccessId, setSentSuccessId] = useState<string | null>(null);
+  const [copiedEmail, setCopiedEmail] = useState(false);
+  const [copiedPin, setCopiedPin] = useState(false);
+  const [modalData, setModalData] = useState<{
+    isOpen: boolean;
+    name: string;
+    email: string;
+    pin: string;
+  } | null>(null);
+
+  const handleCopyEmail = (text: string) => {
+    navigator.clipboard.writeText(text);
+    setCopiedEmail(true);
+    setTimeout(() => setCopiedEmail(false), 2000);
+  };
+
+  const handleCopyPin = (text: string) => {
+    navigator.clipboard.writeText(text);
+    setCopiedPin(true);
+    setTimeout(() => setCopiedPin(false), 2000);
+  };
 
   // Auto-generate secure 6-digit numeric PIN
   const generateSecurePin = () => {
@@ -131,19 +151,24 @@ export default function AdminPejabat({
     setSendingEmailId(id);
     setSentSuccessId(null);
 
-    // Open user's native email client with pre-filled content to send the PIN
-    const subject = encodeURIComponent('PIN Tanda Tangan Digital Resmi - Dinas PUPR Nagekeo');
-    const body = encodeURIComponent(
-      `Yth. Bapak/Ibu ${name},\n\n` +
-      `Berikut adalah PIN Tanda Tangan Digital Anda untuk sistem SPPD & SPT Dinas Pekerjaan Umum dan Penataan Ruang (PUPR) Kabupaten Nagekeo:\n\n` +
-      `PIN ANDA: ${token}\n\n` +
-      `Harap simpan PIN ini dengan aman dan bersifat rahasia. PIN ini digunakan untuk melakukan tanda tangan digital (e-signature) pada dokumen SPPD, SPT, dan Kwitansi Pembayaran.\n\n` +
-      `Terima kasih.\n` +
-      `Admin Dinas PUPR Kabupaten Nagekeo`
-    );
+    const emailSubject = 'PIN Tanda Tangan Digital Resmi - Dinas PUPR Nagekeo';
+    const emailBody = `Yth. Bapak/Ibu ${name},\n\nBerikut adalah PIN Tanda Tangan Digital Anda untuk sistem SPPD & SPT Dinas Pekerjaan Umum dan Penataan Ruang (PUPR) Kabupaten Nagekeo:\n\nPIN ANDA: ${token}\n\nHarap simpan PIN ini dengan aman dan bersifat rahasia. PIN ini digunakan untuk melakukan tanda tangan digital (e-signature) pada dokumen SPPD, SPT, dan Kwitansi Pembayaran.\n\nTerima kasih.\nAdmin Dinas PUPR Kabupaten Nagekeo`;
 
-    // Open native client or redirect
-    window.location.href = `mailto:${targetEmail}?subject=${subject}&body=${body}`;
+    // Attempt to open the native mail client
+    try {
+      const mailtoUrl = `mailto:${targetEmail}?subject=${encodeURIComponent(emailSubject)}&body=${encodeURIComponent(emailBody)}`;
+      window.open(mailtoUrl, '_blank');
+    } catch (e) {
+      console.error('Mailto failed', e);
+    }
+
+    // Always trigger the modal to make sure they can see and copy the PIN and email message
+    setModalData({
+      isOpen: true,
+      name,
+      email: targetEmail,
+      pin: token,
+    });
 
     setTimeout(() => {
       setSendingEmailId(null);
@@ -453,6 +478,115 @@ export default function AdminPejabat({
         </div>
 
       </div>
+
+      {/* Modal Status Kirim Email / Salin PIN Manual */}
+      {modalData && modalData.isOpen && (
+        <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/60 backdrop-blur-xs p-4 animate-fade-in">
+          <div className="bg-white rounded-3xl max-w-lg w-full overflow-hidden shadow-2xl border border-gray-100 flex flex-col transform scale-100 transition-all">
+            {/* Header */}
+            <div className="bg-gradient-to-r from-indigo-600 to-indigo-800 text-white px-6 py-5 flex justify-between items-center">
+              <div className="flex items-center gap-2.5">
+                <span className="text-2xl">📧</span>
+                <div>
+                  <h3 className="font-extrabold text-sm tracking-wide">Pengiriman PIN Otorisasi</h3>
+                  <p className="text-5xs opacity-80 mt-0.5 uppercase tracking-widest font-bold">Dinas PUPR Kabupaten Nagekeo</p>
+                </div>
+              </div>
+              <button
+                onClick={() => setModalData(null)}
+                className="text-white/80 hover:text-white bg-white/10 hover:bg-white/20 h-7 w-7 rounded-full flex items-center justify-center transition font-bold"
+              >
+                ✕
+              </button>
+            </div>
+
+            {/* Content */}
+            <div className="p-6 space-y-5 overflow-y-auto max-h-[75vh]">
+              
+              {/* Success Notification */}
+              <div className="bg-emerald-50 border border-emerald-200 rounded-2xl p-4 flex gap-3 items-start">
+                <span className="text-xl">✅</span>
+                <div className="space-y-1">
+                  <h4 className="text-xs font-bold text-emerald-900">PIN Tanda Tangan Berhasil Dibuat</h4>
+                  <p className="text-3xs text-emerald-700 leading-relaxed">
+                    Sistem telah menghasilkan PIN otorisasi untuk <strong>{modalData.name}</strong> ({modalData.email}). Silakan kirimkan PIN ini kepada yang bersangkutan.
+                  </p>
+                </div>
+              </div>
+
+              {/* Security Warning about Sandbox */}
+              <div className="bg-amber-50 border border-amber-200 rounded-xl p-3 text-3xs text-amber-800 leading-relaxed flex gap-2">
+                <span>⚠️</span>
+                <div>
+                  <strong>Catatan Sandbox:</strong> Jika email otomatis tidak terkirim atau diblokir oleh browser di dalam iframe, harap gunakan tombol <strong>Salin Pesan</strong> di bawah dan kirimkan secara manual melalui WhatsApp atau Gmail.
+                </div>
+              </div>
+
+              {/* PIN Box */}
+              <div className="bg-slate-50 border border-slate-200 rounded-2xl p-5 text-center space-y-2 relative group">
+                <span className="text-4xs uppercase tracking-widest text-slate-400 font-bold block">PIN RAHASIA PEJABAT</span>
+                <div className="text-3xl font-mono font-extrabold text-indigo-700 tracking-widest select-all my-2">
+                  {modalData.pin}
+                </div>
+                <button
+                  onClick={() => handleCopyPin(modalData.pin)}
+                  className="px-3 py-1.5 bg-indigo-50 hover:bg-indigo-100 text-indigo-700 font-extrabold text-4xs rounded-lg border border-indigo-100 transition inline-flex items-center gap-1.5"
+                >
+                  {copiedPin ? '✓ Berhasil Disalin!' : '📋 Salin Kode PIN'}
+                </button>
+              </div>
+
+              {/* Email Content Box */}
+              <div className="space-y-1.5">
+                <div className="flex justify-between items-center">
+                  <label className="text-4xs font-bold text-slate-500 uppercase tracking-wider">Isi Surat / Pesan Email:</label>
+                  <button
+                    onClick={() => handleCopyEmail(
+                      `Yth. Bapak/Ibu ${modalData.name},\n\nBerikut adalah PIN Tanda Tangan Digital Anda untuk sistem SPPD & SPT Dinas Pekerjaan Umum dan Penataan Ruang (PUPR) Kabupaten Nagekeo:\n\nPIN ANDA: ${modalData.pin}\n\nHarap simpan PIN ini dengan aman dan bersifat rahasia. PIN ini digunakan untuk melakukan tanda tangan digital (e-signature) pada dokumen SPPD, SPT, dan Kwitansi Pembayaran.\n\nTerima kasih.\nAdmin Dinas PUPR Kabupaten Nagekeo`
+                    )}
+                    className="text-4xs font-extrabold text-indigo-600 hover:text-indigo-800 transition"
+                  >
+                    {copiedEmail ? '✓ Pesan Disalin!' : '📋 Salin Pesan Lengkap'}
+                  </button>
+                </div>
+                <textarea
+                  readOnly
+                  className="w-full h-32 px-3 py-2 text-3xs text-slate-600 border border-slate-200 rounded-xl bg-slate-50 focus:outline-hidden font-mono leading-relaxed resize-none"
+                  value={
+                    `Yth. Bapak/Ibu ${modalData.name},\n\n` +
+                    `Berikut adalah PIN Tanda Tangan Digital Anda untuk sistem SPPD & SPT Dinas Pekerjaan Umum dan Penataan Ruang (PUPR) Kabupaten Nagekeo:\n\n` +
+                    `PIN ANDA: ${modalData.pin}\n\n` +
+                    `Harap simpan PIN ini dengan aman dan bersifat rahasia. PIN ini digunakan untuk melakukan tanda tangan digital (e-signature) pada dokumen SPPD, SPT, dan Kwitansi Pembayaran.\n\n` +
+                    `Terima kasih.\n` +
+                    `Admin Dinas PUPR Kabupaten Nagekeo`
+                  }
+                />
+              </div>
+
+            </div>
+
+            {/* Footer */}
+            <div className="bg-slate-50 px-6 py-4 border-t border-slate-100 flex gap-2 justify-end">
+              <button
+                onClick={() => {
+                  const subject = 'PIN Tanda Tangan Digital Resmi - Dinas PUPR Nagekeo';
+                  const body = `Yth. Bapak/Ibu ${modalData.name},\n\nBerikut adalah PIN Tanda Tangan Digital Anda untuk sistem SPPD & SPT Dinas Pekerjaan Umum dan Penataan Ruang (PUPR) Kabupaten Nagekeo:\n\nPIN ANDA: ${modalData.pin}\n\nHarap simpan PIN ini dengan aman dan bersifat rahasia. PIN ini digunakan untuk melakukan tanda tangan digital (e-signature) pada dokumen SPPD, SPT, dan Kwitansi Pembayaran.\n\nTerima kasih.\nAdmin Dinas PUPR Kabupaten Nagekeo`;
+                  window.open(`mailto:${modalData.email}?subject=${encodeURIComponent(subject)}&body=${encodeURIComponent(body)}`, '_blank');
+                }}
+                className="px-4 py-2 bg-indigo-600 hover:bg-indigo-700 text-white font-extrabold text-xs rounded-xl shadow-xs transition"
+              >
+                📧 Buka Aplikasi Email
+              </button>
+              <button
+                onClick={() => setModalData(null)}
+                className="px-4 py-2 bg-slate-200 hover:bg-slate-300 text-slate-700 font-extrabold text-xs rounded-xl transition"
+              >
+                Selesai / Tutup
+              </button>
+            </div>
+          </div>
+        </div>
+      )}
     </div>
   );
 }
