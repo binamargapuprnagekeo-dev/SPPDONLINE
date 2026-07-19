@@ -29,9 +29,7 @@ export default function AdminPejabat({
   const [editingPejabat, setEditingPejabat] = useState<PejabatStaff | null>(null);
   const [showPinInput, setShowPinInput] = useState(false);
 
-  // Email sending and modal helper states
-  const [sendingEmailId, setSendingEmailId] = useState<string | null>(null);
-  const [sentSuccessId, setSentSuccessId] = useState<string | null>(null);
+  // Modal and copying states
   const [copiedEmail, setCopiedEmail] = useState(false);
   const [copiedPin, setCopiedPin] = useState(false);
   const [modalData, setModalData] = useState<{
@@ -129,8 +127,8 @@ export default function AdminPejabat({
         };
 
         await onAddPejabat(newPejabat);
-        // Trigger automatic email send animation for the newly added official
-        handleSendEmail(newPejabat.id, newPejabat.email, newPejabat.nama, newPejabat.pin);
+        // Show secure modal to copy the generated PIN manually
+        handleShowPinModal(newPejabat.email, newPejabat.nama, newPejabat.pin);
       }
 
       // Reset form
@@ -147,38 +145,14 @@ export default function AdminPejabat({
     }
   };
 
-  const handleSendEmail = (id: string, targetEmail: string, name: string, token: string) => {
-    setSendingEmailId(id);
-    setSentSuccessId(null);
-
-    const emailSubject = 'Akses Verifikasi Dokumen Dinas PUPR Nagekeo';
-    const emailBody = `Halo Bapak/Ibu ${name},\n\nTerima kasih telah bergabung dengan sistem administrasi SPPD & SPT Dinas Pekerjaan Umum dan Penataan Ruang (PUPR) Kabupaten Nagekeo.\n\nUntuk keperluan otorisasi dokumen dinas secara mandiri, berikut adalah kode verifikasi personal Anda:\n\nKODE VERIFIKASI: ${token}\n\nHarap simpan kode verifikasi ini dengan aman untuk digunakan setiap kali melakukan tanda tangan atau validasi dokumen SPPD & SPT.\n\nSalam,\nAdmin Dinas PUPR Kabupaten Nagekeo`;
-
-    // Attempt to open the native mail client
-    try {
-      const mailtoUrl = `mailto:${targetEmail}?subject=${encodeURIComponent(emailSubject)}&body=${encodeURIComponent(emailBody)}`;
-      window.open(mailtoUrl, '_blank');
-    } catch (e) {
-      console.error('Mailto failed', e);
-    }
-
-    // Always trigger the modal to make sure they can see and copy the PIN and email message
+  const handleShowPinModal = (targetEmail: string, name: string, token: string) => {
+    // Open the manual copy / verification modal
     setModalData({
       isOpen: true,
       name,
       email: targetEmail,
       pin: token,
     });
-
-    setTimeout(() => {
-      setSendingEmailId(null);
-      setSentSuccessId(id);
-      
-      // Auto clear success message after 5 seconds
-      setTimeout(() => {
-        setSentSuccessId(null);
-      }, 5000);
-    }, 1500);
   };
 
   return (
@@ -325,7 +299,7 @@ export default function AdminPejabat({
                 ) : editingPejabat ? (
                   <span>💾 Perbarui & Simpan Perubahan</span>
                 ) : (
-                  <span>💾 Simpan & Kirim PIN ke Email</span>
+                  <span>💾 Simpan & Tampilkan PIN</span>
                 )}
               </button>
               {editingPejabat && (
@@ -402,7 +376,7 @@ export default function AdminPejabat({
                       {/* Secret PIN hidden block */}
                       <td className="p-3 text-center">
                         <div className="inline-block bg-slate-100 px-2 py-1 rounded font-mono font-extrabold text-indigo-700 text-3xs border border-gray-200 tracking-widest">
-                          {sendingEmailId === p.id ? '???' : '••••••'}
+                          ••••••
                         </div>
                         <span className="block text-[8px] text-gray-400 mt-0.5 italic">PIN Terenkripsi</span>
                       </td>
@@ -424,24 +398,13 @@ export default function AdminPejabat({
                       {/* Action to resend Email / Edit / Delete */}
                       <td className="p-3 text-right">
                         <div className="flex items-center justify-end gap-1.5">
-                          {sendingEmailId === p.id ? (
-                            <span className="text-[10px] text-slate-500 font-bold flex items-center justify-end gap-1">
-                              <span className="h-2.5 w-2.5 rounded-full border border-slate-500 border-t-transparent animate-spin inline-block"></span>
-                              Mengirim...
-                            </span>
-                          ) : sentSuccessId === p.id ? (
-                            <span className="text-[10px] text-emerald-600 font-extrabold">
-                              ✓ Terkirim!
-                            </span>
-                          ) : (
-                            <button
-                              onClick={() => handleSendEmail(p.id, p.email, p.nama, p.pin)}
-                              className="px-2 py-1 bg-slate-100 hover:bg-slate-200 text-slate-700 font-bold text-[10px] rounded-lg border border-slate-200 transition"
-                              title="Kirim PIN ke Email"
-                            >
-                              📧 Kirim
-                            </button>
-                          )}
+                          <button
+                            onClick={() => handleShowPinModal(p.email, p.nama, p.pin)}
+                            className="px-2 py-1 bg-slate-100 hover:bg-slate-200 text-slate-700 font-bold text-[10px] rounded-lg border border-slate-200 transition flex items-center gap-1"
+                            title="Lihat PIN Pejabat"
+                          >
+                            🔑 PIN
+                          </button>
                           <button
                             onClick={() => startEdit(p)}
                             className="px-2 py-1 bg-indigo-50 hover:bg-indigo-100 text-indigo-700 font-bold text-[10px] rounded-lg border border-indigo-100 transition"
@@ -514,11 +477,11 @@ export default function AdminPejabat({
                 </div>
               </div>
 
-              {/* Security Warning about Sandbox */}
+              {/* Security Warning about Spam Prevention */}
               <div className="bg-amber-50 border border-amber-200 rounded-xl p-3 text-3xs text-amber-800 leading-relaxed flex gap-2">
-                <span>⚠️</span>
+                <span>🛡️</span>
                 <div>
-                  <strong>Catatan Sandbox:</strong> Jika email otomatis tidak terkirim atau diblokir oleh browser di dalam iframe, harap gunakan tombol <strong>Salin Pesan</strong> di bawah dan kirimkan secara manual melalui WhatsApp atau Gmail.
+                  <strong>Bebas Spam & Aman:</strong> Aplikasi ini tidak mengirimkan email otomatis di latar belakang untuk menjamin PIN tetap rahasia dan tidak terdeteksi sebagai spam oleh penyedia email. Silakan gunakan tombol <strong>Salin PIN</strong> atau <strong>Salin Pesan Lengkap</strong> di bawah untuk mengirimkannya secara aman via WhatsApp, Telegram, atau Email Pribadi.
                 </div>
               </div>
 
