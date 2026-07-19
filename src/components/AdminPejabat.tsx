@@ -27,6 +27,7 @@ export default function AdminPejabat({
   const [pin, setPin] = useState('');
   const [isSubmitting, setIsSubmitting] = useState(false);
   const [editingPejabat, setEditingPejabat] = useState<PejabatStaff | null>(null);
+  const [showPinInput, setShowPinInput] = useState(false);
 
   // Email sending animation states
   const [sendingEmailId, setSendingEmailId] = useState<string | null>(null);
@@ -43,7 +44,7 @@ export default function AdminPejabat({
   };
 
   const startEdit = (p: PejabatStaff) => {
-    const enteredPin = window.prompt('Masukkan PIN Otorisasi (sppd2026) untuk mengedit data Pejabat/Staf ini:');
+    const enteredPin = window.prompt('Masukkan PIN Otorisasi Admin untuk mengedit data Pejabat/Staf ini:');
     if (enteredPin !== 'sppd2026') {
       alert('PIN Salah! Gagal mengedit data.');
       return;
@@ -130,7 +131,20 @@ export default function AdminPejabat({
     setSendingEmailId(id);
     setSentSuccessId(null);
 
-    // Simulate sending email via SMTP/API safely
+    // Open user's native email client with pre-filled content to send the PIN
+    const subject = encodeURIComponent('PIN Tanda Tangan Digital Resmi - Dinas PUPR Nagekeo');
+    const body = encodeURIComponent(
+      `Yth. Bapak/Ibu ${name},\n\n` +
+      `Berikut adalah PIN Tanda Tangan Digital Anda untuk sistem SPPD & SPT Dinas Pekerjaan Umum dan Penataan Ruang (PUPR) Kabupaten Nagekeo:\n\n` +
+      `PIN ANDA: ${token}\n\n` +
+      `Harap simpan PIN ini dengan aman dan bersifat rahasia. PIN ini digunakan untuk melakukan tanda tangan digital (e-signature) pada dokumen SPPD, SPT, dan Kwitansi Pembayaran.\n\n` +
+      `Terima kasih.\n` +
+      `Admin Dinas PUPR Kabupaten Nagekeo`
+    );
+
+    // Open native client or redirect
+    window.location.href = `mailto:${targetEmail}?subject=${subject}&body=${body}`;
+
     setTimeout(() => {
       setSendingEmailId(null);
       setSentSuccessId(id);
@@ -139,7 +153,7 @@ export default function AdminPejabat({
       setTimeout(() => {
         setSentSuccessId(null);
       }, 5000);
-    }, 2500);
+    }, 1500);
   };
 
   return (
@@ -243,15 +257,26 @@ export default function AdminPejabat({
             <div className="space-y-1">
               <label className="block font-bold text-gray-700">PIN Tanda Tangan Digital (6 Digit) *</label>
               <div className="flex gap-2">
-                <input
-                  type="text"
-                  required
-                  maxLength={6}
-                  value={pin}
-                  onChange={(e) => setPin(e.target.value.replace(/\D/g, ''))}
-                  placeholder="Contoh: 884920"
-                  className="w-full px-3 py-2 border border-gray-300 rounded-xl font-mono font-bold text-center text-sm bg-slate-50 text-indigo-700 tracking-widest"
-                />
+                <div className="relative flex-1">
+                  <input
+                    type={showPinInput ? 'text' : 'password'}
+                    required
+                    maxLength={6}
+                    value={pin}
+                    onChange={(e) => setPin(e.target.value.replace(/\D/g, ''))}
+                    placeholder="Contoh: 884920"
+                    className="w-full pl-3 pr-10 py-2 border border-gray-300 rounded-xl font-mono font-bold text-center text-sm bg-slate-50 text-indigo-700 tracking-widest"
+                    id="input-pejabat-pin"
+                  />
+                  <button
+                    type="button"
+                    onClick={() => setShowPinInput(!showPinInput)}
+                    className="absolute right-2 top-1/2 -translate-y-1/2 text-gray-400 hover:text-gray-600 p-1"
+                    title={showPinInput ? 'Sembunyikan PIN' : 'Tampilkan PIN'}
+                  >
+                    {showPinInput ? '🙈' : '👁️'}
+                  </button>
+                </div>
                 <button
                   type="button"
                   onClick={generateSecurePin}

@@ -267,7 +267,7 @@ export default function Dashboard({ user, accessToken, onLogin, onLogout }: Dash
 
   // Delete Registered Pejabat / Staff (requires PIN 'sppd2026')
   const handleDeletePejabat = (id: string) => {
-    const pin = window.prompt('Masukkan PIN Otorisasi (sppd2026) untuk menghapus Pejabat/Staf ini:');
+    const pin = window.prompt('Masukkan PIN Otorisasi Admin untuk menghapus Pejabat/Staf ini:');
     if (pin !== 'sppd2026') {
       alert('PIN Salah! Data Pejabat/Staf gagal dihapus.');
       return;
@@ -347,7 +347,7 @@ export default function Dashboard({ user, accessToken, onLogin, onLogout }: Dash
 
   // Delete SPPD
   const handleDeleteSppd = (id: string) => {
-    const pin = window.prompt('Masukkan PIN Otorisasi (sppd2026) untuk menghapus data SPD ini:');
+    const pin = window.prompt('Masukkan PIN Otorisasi Admin untuk menghapus data SPD ini:');
     if (pin !== 'sppd2026') {
       alert('PIN Salah! Data SPD gagal dihapus.');
       return;
@@ -358,7 +358,7 @@ export default function Dashboard({ user, accessToken, onLogin, onLogout }: Dash
 
   // Delete SPT
   const handleDeleteSpt = (id: string) => {
-    const pin = window.prompt('Masukkan PIN Otorisasi (sppd2026) untuk menghapus data SPT ini:');
+    const pin = window.prompt('Masukkan PIN Otorisasi Admin untuk menghapus data SPT ini:');
     if (pin !== 'sppd2026') {
       alert('PIN Salah! Data SPT gagal dihapus.');
       return;
@@ -457,7 +457,7 @@ export default function Dashboard({ user, accessToken, onLogin, onLogout }: Dash
   };
 
   const handleDeleteDaftarBayar = (id: string) => {
-    const pin = window.prompt('Masukkan PIN Otorisasi (sppd2026) untuk menghapus rincian pembayaran ini:');
+    const pin = window.prompt('Masukkan PIN Otorisasi Admin untuk menghapus rincian pembayaran ini:');
     if (pin !== 'sppd2026') {
       alert('PIN Salah! Data rincian pembayaran gagal dihapus.');
       return;
