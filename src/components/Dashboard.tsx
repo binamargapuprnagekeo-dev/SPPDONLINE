@@ -15,6 +15,7 @@ import SptDocument from './SptDocument';
 import DaftarBayarForm from './DaftarBayarForm';
 import DaftarBayarDocument from './DaftarBayarDocument';
 import InformasiStandar from './InformasiStandar';
+import BukuRegistrasi from './BukuRegistrasi';
 import NagekeoLogo from './NagekeoLogo';
 
 interface DashboardProps {
@@ -26,7 +27,7 @@ interface DashboardProps {
 
 export default function Dashboard({ user, accessToken, onLogin, onLogout }: DashboardProps) {
   // Navigation / Tabs
-  const [activeTab, setActiveTab] = useState<'sppd' | 'spt' | 'pembayaran' | 'standar' | 'logs'>('sppd');
+  const [activeTab, setActiveTab] = useState<'sppd' | 'spt' | 'pembayaran' | 'registrasi' | 'standar' | 'logs'>('sppd');
 
   // Document states (backed up in localStorage)
   const [sppdList, setSppdList] = useState<SppdData[]>([]);
@@ -631,6 +632,18 @@ export default function Dashboard({ user, accessToken, onLogin, onLogout }: Dash
               </span>
             </button>
             <button
+              onClick={() => setActiveTab('registrasi')}
+              className={`w-full text-left px-4 py-2.5 rounded-xl text-xs sm:text-sm font-semibold transition flex items-center justify-between ${
+                activeTab === 'registrasi' ? 'bg-indigo-50 text-indigo-700' : 'text-gray-600 hover:bg-gray-50'
+              }`}
+              id="tab-registrasi"
+            >
+              <span>📖 Buku Registrasi Digital</span>
+              <span className="bg-indigo-100 text-indigo-800 font-bold font-mono px-1.5 py-0.5 rounded text-3xs">
+                {sppdList.length + sptList.length + daftarBayarList.length}
+              </span>
+            </button>
+            <button
               onClick={() => setActiveTab('standar')}
               className={`w-full text-left px-4 py-2.5 rounded-xl text-xs sm:text-sm font-semibold transition flex items-center justify-between ${
                 activeTab === 'standar' ? 'bg-indigo-50 text-indigo-700' : 'text-gray-600 hover:bg-gray-50'
@@ -679,7 +692,7 @@ export default function Dashboard({ user, accessToken, onLogin, onLogout }: Dash
         <div className="lg:col-span-3 space-y-4">
           
           {/* Search bar & statistics */}
-          {activeTab !== 'logs' && activeTab !== 'standar' && (
+          {activeTab !== 'logs' && activeTab !== 'standar' && activeTab !== 'registrasi' && (
             <div className="bg-white border border-gray-200 rounded-2xl p-4 shadow-2xs flex flex-col sm:flex-row gap-3 items-center justify-between">
               <div className="w-full sm:max-w-md relative">
                 <span className="absolute inset-y-0 left-0 flex items-center pl-3 text-gray-400">
@@ -1015,6 +1028,18 @@ export default function Dashboard({ user, accessToken, onLogin, onLogout }: Dash
                 </div>
               )}
             </div>
+          )}
+
+          {/* Buku Registrasi Digital Tab Content */}
+          {activeTab === 'registrasi' && (
+            <BukuRegistrasi
+              sppdList={sppdList}
+              sptList={sptList}
+              daftarBayarList={daftarBayarList}
+              onPreviewSppd={(item) => setPreviewingSppd(item)}
+              onPreviewSpt={(item) => setPreviewingSpt(item)}
+              onPreviewDaftarBayar={(item) => setPreviewingDaftarBayar(item)}
+            />
           )}
 
           {/* Standar Biaya Perbup Tab Content */}
