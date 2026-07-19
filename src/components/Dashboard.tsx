@@ -42,6 +42,7 @@ export default function Dashboard({ user, accessToken, onLogin, onLogout }: Dash
   const [daftarBayarList, setDaftarBayarList] = useState<DaftarBayarData[]>([]);
   const [pejabatList, setPejabatList] = useState<PejabatStaff[]>([]);
   const [syncLogs, setSyncLogs] = useState<SyncLog[]>([]);
+  const [selectedLogIds, setSelectedLogIds] = useState<string[]>([]);
 
   // Search & Filters
   const [searchQuery, setSearchQuery] = useState('');
@@ -119,6 +120,44 @@ export default function Dashboard({ user, accessToken, onLogin, onLogout }: Dash
     const updated = [newLog, ...syncLogs].slice(0, 50); // Keep last 50 logs
     setSyncLogs(updated);
     localStorage.setItem('sppd_sync_logs', JSON.stringify(updated));
+  };
+
+  const handleToggleSelectLog = (id: string) => {
+    setSelectedLogIds((prev) =>
+      prev.includes(id) ? prev.filter((item) => item !== id) : [...prev, id]
+    );
+  };
+
+  const handleSelectAllLogs = () => {
+    if (selectedLogIds.length === syncLogs.length) {
+      setSelectedLogIds([]);
+    } else {
+      setSelectedLogIds(syncLogs.map((log) => log.id));
+    }
+  };
+
+  const handleDeleteIndividualLog = (id: string) => {
+    const updated = syncLogs.filter((log) => log.id !== id);
+    setSyncLogs(updated);
+    localStorage.setItem('sppd_sync_logs', JSON.stringify(updated));
+    setSelectedLogIds((prev) => prev.filter((item) => item !== id));
+  };
+
+  const handleDeleteSelectedLogs = () => {
+    if (window.confirm(`Apakah Anda yakin ingin menghapus ${selectedLogIds.length} log terpilih?`)) {
+      const updated = syncLogs.filter((log) => !selectedLogIds.includes(log.id));
+      setSyncLogs(updated);
+      localStorage.setItem('sppd_sync_logs', JSON.stringify(updated));
+      setSelectedLogIds([]);
+    }
+  };
+
+  const handleClearAllLogs = () => {
+    if (window.confirm('Apakah Anda yakin ingin menghapus seluruh riwayat log sinkronisasi?')) {
+      setSyncLogs([]);
+      localStorage.setItem('sppd_sync_logs', JSON.stringify([]));
+      setSelectedLogIds([]);
+    }
   };
 
   // Google Sheet auto setup on login / token retrieval
@@ -1238,37 +1277,83 @@ export default function Dashboard({ user, accessToken, onLogin, onLogout }: Dash
           {/* Sync & Log History Tab Content */}
           {activeTab === 'logs' && (
             <div className="bg-white border border-gray-200 rounded-2xl overflow-hidden shadow-2xs p-4 sm:p-6" id="logs-history-tab">
-              <div className="border-b border-gray-100 pb-3 mb-4">
-                <h3 className="text-sm font-bold text-gray-900 uppercase tracking-wide">Log Aktivitas Sinkronisasi Google Sheets</h3>
-                <p className="text-3xs sm:text-2xs text-gray-400">Daftar rekaman sinkronisasi berkas tanda tangan digital secara real-time.</p>
+              <div className="border-b border-gray-100 pb-3 mb-4 flex flex-col md:flex-row md:items-center justify-between gap-3">
+                <div>
+                  <h3 className="text-sm font-bold text-gray-900 uppercase tracking-wide">Log Aktivitas Sinkronisasi Google Sheets</h3>
+                  <p className="text-3xs sm:text-2xs text-gray-400">Daftar rekaman sinkronisasi berkas tanda tangan digital secara real-time.</p>
+                </div>
+                {syncLogs.length > 0 && (
+                  <div className="flex flex-wrap items-center gap-2">
+                    <button
+                      onClick={handleSelectAllLogs}
+                      className="px-2.5 py-1.5 border border-slate-200 hover:border-slate-300 text-slate-700 bg-white rounded-xl text-3xs font-extrabold flex items-center gap-1 transition cursor-pointer"
+                    >
+                      {selectedLogIds.length === syncLogs.length ? '🚫 Batal Pilih Semua' : '✓ Pilih Semua'}
+                    </button>
+                    {selectedLogIds.length > 0 && (
+                      <button
+                        onClick={handleDeleteSelectedLogs}
+                        className="px-2.5 py-1.5 bg-red-50 hover:bg-red-100 border border-red-100 text-red-700 rounded-xl text-3xs font-extrabold flex items-center gap-1 transition cursor-pointer"
+                      >
+                        🗑️ Hapus Terpilih ({selectedLogIds.length})
+                      </button>
+                    )}
+                    <button
+                      onClick={handleClearAllLogs}
+                      className="px-2.5 py-1.5 bg-slate-100 hover:bg-slate-200 border border-slate-200 text-slate-700 rounded-xl text-3xs font-extrabold flex items-center gap-1 transition cursor-pointer"
+                    >
+                      🧹 Hapus Semua Log
+                    </button>
+                  </div>
+                )}
               </div>
 
               {syncLogs.length === 0 ? (
                 <p className="text-xs text-gray-400 italic text-center py-10">Belum ada aktivitas sinkronisasi terekam.</p>
               ) : (
                 <div className="space-y-2.5 max-h-[450px] overflow-y-auto">
-                  {syncLogs.map((log) => (
-                    <div
-                      key={log.id}
-                      className={`p-3 rounded-xl border flex items-start gap-3 text-xs ${
-                        log.status === 'success'
-                          ? 'bg-green-50/50 border-green-100 text-green-800'
-                          : 'bg-red-50/50 border-red-100 text-red-800'
-                      }`}
-                    >
-                      <span className="text-sm mt-0.5">{log.status === 'success' ? '✅' : '❌'}</span>
-                      <div className="flex-1">
-                        <div className="flex justify-between items-start gap-2">
-                          <span className="font-bold uppercase text-3xs font-mono tracking-wider">
-                            {log.type} // {log.docId}
-                          </span>
-                          <span className="text-3xs text-gray-400 font-mono">{log.timestamp}</span>
+                  {syncLogs.map((log) => {
+                    const isSelected = selectedLogIds.includes(log.id);
+                    return (
+                      <div
+                        key={log.id}
+                        className={`p-3 rounded-xl border flex items-start gap-3 text-xs transition ${
+                          isSelected
+                            ? 'border-indigo-200 bg-indigo-50/25 text-indigo-900'
+                            : log.status === 'success'
+                            ? 'bg-green-50/50 border-green-100 text-green-800'
+                            : 'bg-red-50/50 border-red-100 text-red-800'
+                        }`}
+                      >
+                        <input
+                          type="checkbox"
+                          checked={isSelected}
+                          onChange={() => handleToggleSelectLog(log.id)}
+                          className="mt-1 h-3.5 w-3.5 rounded-sm text-indigo-600 border-slate-300 focus:ring-indigo-500 cursor-pointer"
+                        />
+                        <span className="text-sm mt-0.5">{log.status === 'success' ? '✅' : '❌'}</span>
+                        <div className="flex-1 min-w-0">
+                          <div className="flex justify-between items-start gap-2">
+                            <span className="font-bold uppercase text-3xs font-mono tracking-wider">
+                              {log.type} // {log.docId}
+                            </span>
+                            <span className="text-3xs text-gray-400 font-mono">{log.timestamp}</span>
+                          </div>
+                          <p className="font-semibold mt-0.5 text-gray-900 truncate">{log.nomor}</p>
+                          <p className="text-3xs text-gray-500 mt-1 font-sans">{log.message}</p>
                         </div>
-                        <p className="font-semibold mt-0.5 text-gray-900">{log.nomor}</p>
-                        <p className="text-3xs text-gray-500 mt-1 font-sans">{log.message}</p>
+                        <button
+                          onClick={() => handleDeleteIndividualLog(log.id)}
+                          className="p-1 hover:bg-red-100 hover:text-red-600 rounded-lg text-gray-400 transition ml-2 self-center cursor-pointer"
+                          title="Hapus log ini"
+                        >
+                          <svg xmlns="http://www.w3.org/2000/svg" className="h-3.5 w-3.5" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+                            <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M19 7l-.867 12.142A2 2 0 0116.138 21H7.862a2 2 0 01-1.995-1.858L5 7m5 4v6m4-6v6m1-10V4a1 1 0 00-1-1h-4a1 1 0 00-1 1v3M4 7h16" />
+                          </svg>
+                        </button>
                       </div>
-                    </div>
-                  ))}
+                    );
+                  })}
                 </div>
               )}
             </div>
