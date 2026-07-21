@@ -37,6 +37,17 @@ export interface SppdData {
   encryptedSignature: string;
   createdAt: string;
   syncStatus: 'synced' | 'pending' | 'failed';
+  
+  // Extra fields for Luar Daerah
+  tipePerjalanan?: 'Luar Daerah' | 'Dalam Daerah';
+  indeksBulan?: string;
+  indeksTahun?: string;
+  nomorUrutPetugas?: string;
+  kodeRup?: string;
+  sumberPembiayaan?: string;
+  pejabatTtdSptType?: string; // '1' - '6'
+  pejabatTtdSpdType?: string; // '1' - '2'
+  pejabatTtdSpdPulangType?: string; // '1' - '2'
 }
 
 export interface TugaskanKepada {
@@ -65,6 +76,17 @@ export interface SptData {
   encryptedSignature: string;
   createdAt: string;
   syncStatus: 'synced' | 'pending' | 'failed';
+
+  // Extra fields for Luar Daerah
+  tipePerjalanan?: 'Luar Daerah' | 'Dalam Daerah';
+  indeksBulan?: string;
+  indeksTahun?: string;
+  nomorUrutPetugas?: string;
+  kodeRup?: string;
+  sumberPembiayaan?: string;
+  pejabatTtdSptType?: string; // '1' - '6'
+  pejabatTtdSpdType?: string; // '1' - '2'
+  pejabatTtdSpdPulangType?: string; // '1' - '2'
 }
 
 export interface SyncLog {

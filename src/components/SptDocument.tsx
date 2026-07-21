@@ -10,7 +10,116 @@ interface SptDocumentProps {
 
 export default function SptDocument({ data, onClose }: SptDocumentProps) {
   const [isDigital, setIsDigital] = useState(true);
+  const [copiedEnc, setCopiedEnc] = useState(false);
   const verifyUrl = `${window.location.origin}/verify?data=${encodeURIComponent(data.encryptedSignature)}`;
+
+  const copyEncryptedSignature = () => {
+    navigator.clipboard.writeText(data.encryptedSignature);
+    setCopiedEnc(true);
+    setTimeout(() => setCopiedEnc(false), 2000);
+  };
+
+  const downloadQRCode = () => {
+    const svgElement = document.getElementById('spt-qr-code');
+    if (!svgElement) return;
+    const svgString = new XMLSerializer().serializeToString(svgElement);
+    const svgBlob = new Blob([svgString], { type: 'image/svg+xml;charset=utf-8' });
+    const svgUrl = URL.createObjectURL(svgBlob);
+    const downloadLink = document.createElement('a');
+    downloadLink.href = svgUrl;
+    downloadLink.download = `QRCode_SPT_${data.nomor.replace(/[\/\\?%*:|"<>\s]/g, '_')}.svg`;
+    document.body.appendChild(downloadLink);
+    downloadLink.click();
+    document.body.removeChild(downloadLink);
+    URL.revokeObjectURL(svgUrl);
+  };
+
+  const getSptSigner = () => {
+    if (data.tipePerjalanan === 'Dalam Daerah') {
+      const type = data.pejabatTtdSptType || '2';
+      if (type === '1') {
+        return {
+          role: 'Kepala Dinas Pekerjaan Umum\ndan Penataan Ruang Kab. Nagekeo',
+          nama: data.penandatanganNama || 'SYARIFUDIN IBRAHIM, ST',
+          pangkat: data.penandatanganPangkat || 'Pembina Utama Muda - IV/c',
+          nip: data.penandatanganNip || 'NIP. 19681102 199703 1 008',
+          kopType: 'dpupr',
+        };
+      } else {
+        return {
+          role: 'a.n. Kepala Dinas Pekerjaan Umum\ndan Penataan Ruang Kab. Nagekeo\nSekretaris,',
+          nama: data.penandatanganNama || 'ANSELMUS MERE, SE',
+          pangkat: data.penandatanganPangkat || 'Pembina Tk.I - IV/b',
+          nip: data.penandatanganNip || 'NIP. 19740413 200901 1 001',
+          kopType: 'dpupr',
+        };
+      }
+    }
+
+    if (data.tipePerjalanan === 'Luar Daerah') {
+      switch (data.pejabatTtdSptType) {
+        case '1':
+          return {
+            role: 'BUPATI NAGEKEO',
+            nama: data.penandatanganNama || 'SIMPLISIUS DONATUS',
+            pangkat: data.penandatanganPangkat || '',
+            nip: data.penandatanganNip || '',
+            kopType: 'bupati',
+          };
+        case '2':
+          return {
+            role: 'WAKIL BUPATI NAGEKEO',
+            nama: data.penandatanganNama || 'MARIANUS WAE',
+            pangkat: data.penandatanganPangkat || '',
+            nip: data.penandatanganNip || '',
+            kopType: 'bupati',
+          };
+        case '3':
+          return {
+            role: 'SEKRETARIS DAERAH KABUPATEN NAGEKEO',
+            nama: data.penandatanganNama || 'Drs. LUKAS GERA',
+            pangkat: data.penandatanganPangkat || 'Pembina Utama Madya',
+            nip: data.penandatanganNip || 'NIP. 19671205 199303 1 007',
+            kopType: 'sekretariat',
+          };
+        case '4':
+          return {
+            role: 'ASISTEN PEMERINTAHAN DAN KESEJAHTERAAN RAKYAT',
+            nama: data.penandatanganNama || 'IMANUEL MBAPA, SH',
+            pangkat: data.penandatanganPangkat || 'Pembina Utama Muda',
+            nip: data.penandatanganNip || 'NIP. 19700502 199602 1 003',
+            kopType: 'sekretariat',
+          };
+        case '5':
+          return {
+            role: 'ASISTEN PEREKONOMIAN DAN PEMBANGUNAN',
+            nama: data.penandatanganNama || 'Drs. AGUSTINUS SEKOU',
+            pangkat: data.penandatanganPangkat || 'Pembina Utama Muda',
+            nip: data.penandatanganNip || 'NIP. 19690815 199503 1 002',
+            kopType: 'sekretariat',
+          };
+        case '6':
+          return {
+            role: 'ASISTEN ADMINISTRASI UMUM',
+            nama: data.penandatanganNama || 'YULIUS SAGO, S.Sos',
+            pangkat: data.penandatanganPangkat || 'Pembina Utama Muda',
+            nip: data.penandatanganNip || 'NIP. 19710324 199803 1 004',
+            kopType: 'sekretariat',
+          };
+        default:
+          break;
+      }
+    }
+    return {
+      role: 'Kepala Dinas Pekerjaan Umum dan Penataan Ruang Kab. Nagekeo',
+      nama: data.penandatanganNama || 'Syarifudin Ibrahim, ST',
+      pangkat: data.penandatanganPangkat || 'Pembina Utama Muda',
+      nip: data.penandatanganNip || 'NIP. 19681102 199703 1 008',
+      kopType: 'dpupr',
+    };
+  };
+
+  const signer = getSptSigner();
 
   const printDigital = () => {
     setIsDigital(true);
@@ -71,18 +180,42 @@ export default function SptDocument({ data, onClose }: SptDocumentProps) {
       <div className="bg-white text-black p-4 sm:p-8 font-sans leading-relaxed text-xs sm:text-sm print:p-0">
         
         {/* Header Section */}
-        <div className="flex items-center border-b-[3px] border-black pb-3 mb-4">
-          <div className="w-16 h-16 flex-shrink-0 flex items-center justify-center">
-            <NagekeoLogo size={60} />
+        {signer.kopType === 'bupati' ? (
+          <div className="flex flex-col items-center border-b-[3px] border-black pb-3 mb-6 text-center">
+            <div className="w-20 h-20 flex items-center justify-center mb-1">
+              <NagekeoLogo size={72} />
+            </div>
+            <div className="font-bold">
+              <h1 className="text-base sm:text-lg tracking-widest text-black uppercase font-black">BUPATI NAGEKEO</h1>
+            </div>
           </div>
-          <div className="flex-1 text-center font-bold px-4">
-            <h1 className="text-sm sm:text-base tracking-wide text-black uppercase">Pemerintah Kabupaten Nagekeo</h1>
-            <h2 className="text-base sm:text-lg text-black uppercase leading-tight font-extrabold">Sekretariat Daerah</h2>
-            <p className="text-2xs sm:text-xs font-normal italic text-gray-700">Kompleks Civic Center - No......... Telp. ......</p>
-            <p className="text-xs sm:text-sm text-black tracking-widest uppercase">MBAY</p>
+        ) : signer.kopType === 'dpupr' ? (
+          <div className="flex items-center border-b-[3px] border-black pb-3 mb-4">
+            <div className="w-16 h-16 flex-shrink-0 flex items-center justify-center">
+              <NagekeoLogo size={60} />
+            </div>
+            <div className="flex-1 text-center font-bold px-4">
+              <h1 className="text-sm sm:text-base tracking-wide text-black uppercase">Pemerintah Kabupaten Nagekeo</h1>
+              <h2 className="text-base sm:text-lg text-black uppercase leading-tight font-extrabold">Dinas Pekerjaan Umum dan Penataan Ruang</h2>
+              <p className="text-2xs sm:text-xs font-normal italic text-gray-700">Kompeks Bendung Sutami - No......... Telp. ......</p>
+              <p className="text-xs sm:text-sm text-black tracking-widest uppercase">MBAY</p>
+            </div>
+            <div className="w-16"></div> {/* Spacer to keep center balanced */}
           </div>
-          <div className="w-16"></div> {/* Spacer to keep center balanced */}
-        </div>
+        ) : (
+          <div className="flex items-center border-b-[3px] border-black pb-3 mb-4">
+            <div className="w-16 h-16 flex-shrink-0 flex items-center justify-center">
+              <NagekeoLogo size={60} />
+            </div>
+            <div className="flex-1 text-center font-bold px-4">
+              <h1 className="text-sm sm:text-base tracking-wide text-black uppercase">Pemerintah Kabupaten Nagekeo</h1>
+              <h2 className="text-base sm:text-lg text-black uppercase leading-tight font-extrabold">Sekretariat Daerah</h2>
+              <p className="text-2xs sm:text-xs font-normal italic text-gray-700">Kompleks Civic Center - No......... Telp. ......</p>
+              <p className="text-xs sm:text-sm text-black tracking-widest uppercase">MBAY</p>
+            </div>
+            <div className="w-16"></div> {/* Spacer to keep center balanced */}
+          </div>
+        )}
 
         {/* Title Block */}
         <div className="text-center mb-6">
@@ -177,7 +310,7 @@ export default function SptDocument({ data, onClose }: SptDocumentProps) {
           Demikian Surat Perintah Tugas ini dibuat, untuk dilaksanakan dan dipergunakan sebagaimana mestinya, dan setelah selesai menjalankan Surat Perintah Tugas ini diharuskan menyampaikan hasil laporan kepada yang memberikan tugas.
         </div>
 
-        {/* Footer Signature Block */}
+         {/* Footer Signature Block */}
         <div className="mt-8 flex justify-between items-start">
           <div className="w-1/2">
             {/* Left side space */}
@@ -187,8 +320,9 @@ export default function SptDocument({ data, onClose }: SptDocumentProps) {
             <p>Pada Tanggal : {data.tanggalDitetapkan}</p>
             
             <div className="mt-4 font-bold leading-snug">
-              <p>Kepala Dinas Pekerjaan Umum</p>
-              <p>dan Penataan Ruang Kab. Nagekeo</p>
+              {signer.role.split('\n').map((line, lIdx) => (
+                <p key={lIdx}>{line}</p>
+              ))}
             </div>
 
             {/* Conditional Signature View */}
@@ -206,8 +340,26 @@ export default function SptDocument({ data, onClose }: SptDocumentProps) {
                 <div className="text-3xs sm:text-2xs text-gray-500 font-mono leading-tight max-w-[160px]">
                   <p className="text-green-700 font-bold">● TANDA TANGAN DIGITAL</p>
                   <p className="mt-0.5">ID: {data.id}</p>
-                  <p className="truncate">Enc: {data.encryptedSignature.substring(0, 16)}...</p>
+                  <p className="truncate" title={data.encryptedSignature}>Enc: {data.encryptedSignature.substring(0, 16)}...</p>
                   <p className="text-gray-400 mt-1">Scan untuk verifikasi dokumen asli</p>
+                  
+                  {/* Action buttons next to QR, hidden on print */}
+                  <div className="mt-2 flex flex-wrap gap-1.5 print:hidden">
+                    <button
+                      onClick={copyEncryptedSignature}
+                      className="px-2 py-1 bg-indigo-50 hover:bg-indigo-100 text-indigo-700 font-bold rounded text-[10px] flex items-center gap-1 transition cursor-pointer border border-indigo-100"
+                      title="Salin seluruh kode enkripsi digital signature"
+                    >
+                      {copiedEnc ? '✓ Tersalin' : '📋 Salin Kode'}
+                    </button>
+                    <button
+                      onClick={downloadQRCode}
+                      className="px-2 py-1 bg-emerald-50 hover:bg-emerald-100 text-emerald-700 font-bold rounded text-[10px] flex items-center gap-1 transition cursor-pointer border border-emerald-100"
+                      title="Unduh file gambar QR Code"
+                    >
+                      📥 Unduh QR
+                    </button>
+                  </div>
                 </div>
               </div>
             ) : (
@@ -218,9 +370,9 @@ export default function SptDocument({ data, onClose }: SptDocumentProps) {
             )}
 
             <div className="mt-4 font-bold leading-tight">
-              <p className="underline uppercase tracking-wide text-black">{data.penandatanganNama}</p>
-              <p className="font-normal text-gray-800 text-xs">{data.penandatanganPangkat}</p>
-              <p className="font-normal text-gray-800 text-xs">{data.penandatanganNip}</p>
+              <p className="underline uppercase tracking-wide text-black">{signer.nama}</p>
+              {signer.pangkat && <p className="font-normal text-gray-800 text-xs">{signer.pangkat}</p>}
+              {signer.nip && <p className="font-normal text-gray-800 text-xs">{signer.nip}</p>}
             </div>
           </div>
         </div>
@@ -234,6 +386,50 @@ export default function SptDocument({ data, onClose }: SptDocumentProps) {
         ) : (
           <div className="mt-12 text-[9px] text-gray-400 font-mono text-center border-t border-dashed border-gray-300 pt-2 print:mt-8" id="spt-footer-note-manual">
             Dokumen fisik Dinas Pekerjaan Umum dan Penataan Ruang Kabupaten Nagekeo. (Tanda Tangan Manual)
+          </div>
+        )}
+
+        {/* Detail Enkripsi Admin Panel (Hidden on Print) */}
+        {isDigital && (
+          <div className="mt-8 bg-slate-50 border border-slate-200 rounded-xl p-4 space-y-3 print:hidden text-left" id="spt-admin-panel">
+            <div className="flex items-center justify-between">
+              <h4 className="text-xs font-bold text-slate-800 uppercase tracking-wider flex items-center gap-1.5">
+                🔑 Panel Utilitas Digital Signature (Khusus Admin)
+              </h4>
+              <span className="text-[10px] text-slate-400 font-mono font-bold">STATUS: AMAN</span>
+            </div>
+            <p className="text-2xs text-slate-600">
+              Gunakan utilitas di bawah ini untuk mengunduh kode QR resmi atau menyalin payload digital signature terenkripsi untuk kebutuhan verifikasi offline.
+            </p>
+            <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
+              <div className="space-y-1.5 bg-white p-3 rounded-lg border border-slate-150">
+                <span className="block text-3xs font-extrabold text-slate-500 uppercase">Gambar QR Code Resmi</span>
+                <button
+                  onClick={downloadQRCode}
+                  className="w-full py-2 bg-emerald-600 hover:bg-emerald-700 text-white rounded-lg text-xs font-bold transition flex items-center justify-center gap-1.5 cursor-pointer shadow-xs"
+                >
+                  📥 Unduh QR Code (.SVG)
+                </button>
+                <p className="text-4xs text-slate-400 italic text-center">Berguna untuk dicetak ulang pada dokumen fisik atau arsip digital.</p>
+              </div>
+              <div className="space-y-1.5 bg-white p-3 rounded-lg border border-slate-150">
+                <div className="flex items-center justify-between">
+                  <span className="block text-3xs font-extrabold text-slate-500 uppercase">Payload Digital Signature</span>
+                  <button
+                    onClick={copyEncryptedSignature}
+                    className="text-3xs text-indigo-600 hover:text-indigo-800 font-bold"
+                  >
+                    {copiedEnc ? '✓ Tersalin!' : 'Salin Semua'}
+                  </button>
+                </div>
+                <textarea
+                  readOnly
+                  value={data.encryptedSignature}
+                  className="w-full h-11 px-2 py-1 bg-slate-50 border border-slate-100 rounded text-4xs font-mono text-slate-500 resize-none focus:outline-none"
+                  title="Klik tombol salin di atas untuk menyalin semua"
+                />
+              </div>
+            </div>
           </div>
         )}
       </div>

@@ -10,7 +10,109 @@ interface SppdDocumentProps {
 
 export default function SppdDocument({ data, onClose }: SppdDocumentProps) {
   const [isDigital, setIsDigital] = useState(true);
+  const [copiedEnc, setCopiedEnc] = useState(false);
   const verifyUrl = `${window.location.origin}/verify?data=${encodeURIComponent(data.encryptedSignature)}`;
+
+  const copyEncryptedSignature = () => {
+    navigator.clipboard.writeText(data.encryptedSignature);
+    setCopiedEnc(true);
+    setTimeout(() => setCopiedEnc(false), 2000);
+  };
+
+  const downloadQRCode = () => {
+    const svgElement = document.getElementById('sppd-qr-code');
+    if (!svgElement) return;
+    const svgString = new XMLSerializer().serializeToString(svgElement);
+    const svgBlob = new Blob([svgString], { type: 'image/svg+xml;charset=utf-8' });
+    const svgUrl = URL.createObjectURL(svgBlob);
+    const downloadLink = document.createElement('a');
+    downloadLink.href = svgUrl;
+    downloadLink.download = `QRCode_SPD_${data.nomor.replace(/[\/\\?%*:|"<>\s]/g, '_')}.svg`;
+    document.body.appendChild(downloadLink);
+    downloadLink.click();
+    document.body.removeChild(downloadLink);
+    URL.revokeObjectURL(svgUrl);
+  };
+
+  const getSpdSigner = () => {
+    if (data.penandatanganNama) {
+      const type = data.pejabatTtdSpdType || '1';
+      let role = 'Kepala Dinas Pekerjaan Umum\ndan Penataan Ruang Kab. Nagekeo';
+      if (type === '2') {
+        role = 'a.n. Kepala Dinas Pekerjaan Umum\ndan Penataan Ruang Kab. Nagekeo\nSekretaris,';
+      }
+      return {
+        role,
+        nama: data.penandatanganNama,
+        pangkat: data.penandatanganPangkat || '',
+        nip: data.penandatanganNip || '',
+      };
+    }
+
+    const type = data.pejabatTtdSpdType || '1';
+    if (type === '2') {
+      return {
+        role: 'a.n. Kepala Dinas Pekerjaan Umum\ndan Penataan Ruang Kab. Nagekeo\nSekretaris,',
+        nama: 'ANSELMUS MERE, SE',
+        pangkat: 'Pembina Tk.I - IV/b',
+        nip: 'NIP. 19740413 200901 1 001',
+      };
+    }
+    return {
+      role: 'Kepala Dinas Pekerjaan Umum\ndan Penataan Ruang Kab. Nagekeo',
+      nama: 'SYARIFUDIN IBRAHIM, ST',
+      pangkat: 'Pembina Utama Muda - IV/c',
+      nip: 'NIP. 19681102 199703 1 008',
+    };
+  };
+
+  const getSpdPulangSigner = () => {
+    const type = data.pejabatTtdSpdPulangType || '1';
+    let role = 'Kepala Dinas Pekerjaan Umum\ndan Penataan Ruang Kab. Nagekeo';
+    let searchKeywords = ['kepala dinas', 'kadis'];
+    let defaultVal = {
+      nama: 'SYARIFUDIN IBRAHIM, ST',
+      pangkat: 'Pembina Utama Muda - IV/c',
+      nip: 'NIP. 19681102 199703 1 008',
+    };
+
+    if (type === '2') {
+      role = 'a.n. Kepala Dinas Pekerjaan Umum\ndan Penataan Ruang Kab. Nagekeo\nSekretaris,';
+      searchKeywords = ['sekretaris'];
+      defaultVal = {
+        nama: 'ANSELMUS MERE, SE',
+        pangkat: 'Pembina Tk.I - IV/b',
+        nip: 'NIP. 19740413 200901 1 001',
+      };
+    }
+
+    try {
+      const saved = localStorage.getItem('pejabat_records');
+      const list = saved ? JSON.parse(saved) : [];
+      const found = list.find((p: any) => 
+        p.status === 'Aktif' && 
+        searchKeywords.some(kw => p.jabatan?.toLowerCase().includes(kw))
+      );
+      if (found) {
+        return {
+          role,
+          nama: found.nama,
+          pangkat: found.pangkatGol || '',
+          nip: found.nip ? (found.nip.startsWith('NIP.') ? found.nip : `NIP. ${found.nip}`) : '',
+        };
+      }
+    } catch (e) {
+      console.error('Error loading pejabat list in SppdDocument:', e);
+    }
+
+    return {
+      role,
+      ...defaultVal,
+    };
+  };
+
+  const spdSigner = getSpdSigner();
+  const spdPulangSigner = getSpdPulangSigner();
 
   const printDigital = () => {
     setIsDigital(true);
@@ -279,8 +381,9 @@ export default function SppdDocument({ data, onClose }: SppdDocumentProps) {
             <p>Pada tanggal : {data.tanggalDikeluarkan}</p>
             
             <div className="mt-4 font-bold leading-snug">
-              <p>Kepala Dinas Pekerjaan Umum</p>
-              <p>dan Penataan Ruang Kab. Nagekeo</p>
+              {spdSigner.role.split('\n').map((line, lIdx) => (
+                <p key={lIdx}>{line}</p>
+              ))}
             </div>
 
             {/* Conditional Signature View */}
@@ -298,8 +401,26 @@ export default function SppdDocument({ data, onClose }: SppdDocumentProps) {
                 <div className="text-3xs sm:text-2xs text-gray-500 font-mono leading-tight max-w-[160px]">
                   <p className="text-green-700 font-bold">● TANDA TANGAN DIGITAL</p>
                   <p className="mt-0.5">ID: {data.id}</p>
-                  <p className="truncate">Enc: {data.encryptedSignature.substring(0, 16)}...</p>
+                  <p className="truncate" title={data.encryptedSignature}>Enc: {data.encryptedSignature.substring(0, 16)}...</p>
                   <p className="text-gray-400 mt-1">Scan untuk verifikasi dokumen asli</p>
+                  
+                  {/* Action buttons next to QR, hidden on print */}
+                  <div className="mt-2 flex flex-wrap gap-1.5 print:hidden">
+                    <button
+                      onClick={copyEncryptedSignature}
+                      className="px-2 py-1 bg-indigo-50 hover:bg-indigo-100 text-indigo-700 font-bold rounded text-[10px] flex items-center gap-1 transition cursor-pointer border border-indigo-100"
+                      title="Salin seluruh kode enkripsi digital signature"
+                    >
+                      {copiedEnc ? '✓ Tersalin' : '📋 Salin Kode'}
+                    </button>
+                    <button
+                      onClick={downloadQRCode}
+                      className="px-2 py-1 bg-emerald-50 hover:bg-emerald-100 text-emerald-700 font-bold rounded text-[10px] flex items-center gap-1 transition cursor-pointer border border-emerald-100"
+                      title="Unduh file gambar QR Code"
+                    >
+                      📥 Unduh QR
+                    </button>
+                  </div>
                 </div>
               </div>
             ) : (
@@ -310,9 +431,9 @@ export default function SppdDocument({ data, onClose }: SppdDocumentProps) {
             )}
 
             <div className="mt-4 font-bold leading-tight">
-              <p className="underline uppercase tracking-wide text-black">{data.penandatanganNama}</p>
-              <p className="font-normal text-gray-800 text-xs">{data.penandatanganPangkat}</p>
-              <p className="font-normal text-gray-800 text-xs">{data.penandatanganNip}</p>
+              <p className="underline uppercase tracking-wide text-black">{spdSigner.nama}</p>
+              <p className="font-normal text-gray-800 text-xs">{spdSigner.pangkat}</p>
+              <p className="font-normal text-gray-800 text-xs">{spdSigner.nip}</p>
             </div>
           </div>
         </div>
@@ -326,6 +447,172 @@ export default function SppdDocument({ data, onClose }: SppdDocumentProps) {
         ) : (
           <div className="mt-12 text-[9px] text-gray-400 font-mono text-center border-t border-dashed border-gray-300 pt-2 print:mt-8" id="sppd-footer-note-manual">
             Dokumen fisik Dinas Pekerjaan Umum dan Penataan Ruang Kabupaten Nagekeo. (Tanda Tangan Manual)
+          </div>
+        )}
+
+        {/* SPD Lembar Kedua (Halaman Belakang) - Page break on print */}
+        <div className="print:break-before-page mt-16 pt-12 border-t-[3px] border-black" id="sppd-page-2">
+          <div className="text-center mb-6">
+            <h2 className="text-sm sm:text-base font-extrabold uppercase tracking-wider underline decoration-1">
+              SPPD LEMBAR KEDUA (HALAMAN BELAKANG)
+            </h2>
+            <p className="text-xs sm:text-sm font-medium mt-1">
+              Perjalanan Dinas {data.tipePerjalanan || 'Dalam Daerah'} - No. SPD: {data.nomor}
+            </p>
+          </div>
+
+          <div className="border border-black text-xs sm:text-sm divide-y divide-black">
+            {/* Row I */}
+            <div className="grid grid-cols-2 divide-x divide-black">
+              <div className="p-3">
+                <p className="font-bold text-black">I. Berangkat dari (tempat kedudukan) : Mbay</p>
+                <p>Ke : {data.tempatTujuan}</p>
+                <p>Pada tanggal : {data.tanggalBerangkat}</p>
+                <div className="mt-4 font-bold text-gray-800 leading-tight">
+                  {spdSigner.role.split('\n').map((line, lIdx) => (
+                    <p key={lIdx}>{line}</p>
+                  ))}
+                </div>
+                <div className="h-14 border-b border-dashed border-gray-200 my-2 max-w-[200px] flex items-center justify-center">
+                  <span className="text-4xs text-gray-300 italic">Tanda Tangan / Stempel Basah</span>
+                </div>
+                <p className="font-bold underline uppercase">{spdSigner.nama}</p>
+                <p className="text-2xs text-gray-600">{spdSigner.pangkat}</p>
+                <p className="text-2xs text-gray-600">{spdSigner.nip}</p>
+              </div>
+              <div className="p-3">
+                {/* Empty right side for Row I */}
+              </div>
+            </div>
+
+            {/* Row II */}
+            <div className="grid grid-cols-2 divide-x divide-black">
+              <div className="p-3">
+                <p className="font-bold text-black">II. Tiba di : {data.tempatTujuan}</p>
+                <p>Pada tanggal : {data.tanggalBerangkat}</p>
+              </div>
+              <div className="p-3">
+                <p className="font-bold text-black">Berangkat dari : {data.tempatTujuan}</p>
+                <p>Ke : Mbay</p>
+                <p>Pada tanggal : {data.tanggalKembali}</p>
+              </div>
+            </div>
+
+            {/* Row III */}
+            <div className="grid grid-cols-2 divide-x divide-black">
+              <div className="p-3">
+                <p className="font-bold text-black">III. Tiba di : .............................................</p>
+                <p>Pada tanggal : .............................................</p>
+              </div>
+              <div className="p-3">
+                <p className="font-bold text-black">Berangkat dari : .............................................</p>
+                <p>Ke : .............................................</p>
+                <p>Pada tanggal : .............................................</p>
+              </div>
+            </div>
+
+            {/* Row IV */}
+            <div className="grid grid-cols-2 divide-x divide-black">
+              <div className="p-3">
+                <p className="font-bold text-black">IV. Tiba di : .............................................</p>
+                <p>Pada tanggal : .............................................</p>
+              </div>
+              <div className="p-3">
+                <p className="font-bold text-black">Berangkat dari : .............................................</p>
+                <p>Ke : .............................................</p>
+                <p>Pada tanggal : .............................................</p>
+              </div>
+            </div>
+
+            {/* Row V */}
+            <div className="grid grid-cols-2 divide-x divide-black">
+              <div className="p-3">
+                <p className="font-bold text-black">V. Tiba di (tempat kedudukan) : Mbay</p>
+                <p>Pada tanggal : {data.tanggalKembali}</p>
+                
+                <div className="mt-4 text-center">
+                  <p className="font-bold text-black">Pejabat Pelaksana Teknis Kegiatan</p>
+                  <div className="h-14 border-b border-dashed border-gray-200 my-2 max-w-[200px] mx-auto flex items-center justify-center">
+                    <span className="text-4xs text-gray-300 italic">Tanda Tangan</span>
+                  </div>
+                  <p className="font-bold underline uppercase">ANSELMUS MERE, SE</p>
+                  <p className="text-2xs text-gray-600">Pembina Tk.I - IV/b</p>
+                  <p className="text-2xs text-gray-600">NIP. 19740413 200901 1 001</p>
+                </div>
+              </div>
+              <div className="p-3 flex flex-col justify-between">
+                <p className="text-xs leading-normal">
+                  Telah diperiksa, dengan keterangan bahwa perjalanan tersebut diatas benar dilakukan atas perintahnya dan semata-mata untuk kepentingan jabatan dalam waktu yang sesingkat-singkatnya.
+                </p>
+                
+                <div className="mt-4 text-center">
+                  <p className="font-bold text-black">Pejabat Pelaksana Teknis Kegiatan</p>
+                  <div className="h-14 border-b border-dashed border-gray-200 my-2 max-w-[200px] mx-auto flex items-center justify-center">
+                    <span className="text-4xs text-gray-300 italic">Tanda Tangan</span>
+                  </div>
+                  <p className="font-bold underline uppercase">ANSELMUS MERE, SE</p>
+                  <p className="text-2xs text-gray-600">Pembina Tk.I - IV/b</p>
+                  <p className="text-2xs text-gray-600">NIP. 19740413 200901 1 001</p>
+                </div>
+              </div>
+            </div>
+
+            {/* Row VI */}
+            <div className="p-3">
+              <p className="font-bold text-black uppercase">VI. Catatan Lain-lain :</p>
+            </div>
+
+            {/* Row VII */}
+            <div className="p-3 bg-gray-50/50">
+              <p className="font-bold text-red-900 uppercase text-2xs tracking-wide">VII. Perhatian :</p>
+              <p className="text-3xs sm:text-2xs text-gray-600 mt-1 leading-normal text-justify">
+                PPK yang menerbitkan SPD, pegawai yang melakukan perjalanan dinas, para pejabat yang mengesahkan tanggal berangkat/tiba, serta bendahara pengeluaran bertanggung jawab berdasarkan peraturan-peraturan Keuangan Negara apabila negara menderita rugi akibat kesalahan, kelalaian, dan kealpaannya.
+              </p>
+            </div>
+          </div>
+        </div>
+
+        {/* Detail Enkripsi Admin Panel (Hidden on Print) */}
+        {isDigital && (
+          <div className="mt-8 bg-slate-50 border border-slate-200 rounded-xl p-4 space-y-3 print:hidden text-left" id="sppd-admin-panel">
+            <div className="flex items-center justify-between">
+              <h4 className="text-xs font-bold text-slate-800 uppercase tracking-wider flex items-center gap-1.5">
+                🔑 Panel Utilitas Digital Signature (Khusus Admin)
+              </h4>
+              <span className="text-[10px] text-slate-400 font-mono font-bold">STATUS: AMAN</span>
+            </div>
+            <p className="text-2xs text-slate-600">
+              Gunakan utilitas di bawah ini untuk mengunduh kode QR resmi atau menyalin payload digital signature terenkripsi untuk kebutuhan verifikasi offline.
+            </p>
+            <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
+              <div className="space-y-1.5 bg-white p-3 rounded-lg border border-slate-150">
+                <span className="block text-3xs font-extrabold text-slate-500 uppercase">Gambar QR Code Resmi</span>
+                <button
+                  onClick={downloadQRCode}
+                  className="w-full py-2 bg-emerald-600 hover:bg-emerald-700 text-white rounded-lg text-xs font-bold transition flex items-center justify-center gap-1.5 cursor-pointer shadow-xs"
+                >
+                  📥 Unduh QR Code (.SVG)
+                </button>
+                <p className="text-4xs text-slate-400 italic text-center">Berguna untuk dicetak ulang pada dokumen fisik atau arsip digital.</p>
+              </div>
+              <div className="space-y-1.5 bg-white p-3 rounded-lg border border-slate-150">
+                <div className="flex items-center justify-between">
+                  <span className="block text-3xs font-extrabold text-slate-500 uppercase">Payload Digital Signature</span>
+                  <button
+                    onClick={copyEncryptedSignature}
+                    className="text-3xs text-indigo-600 hover:text-indigo-800 font-bold"
+                  >
+                    {copiedEnc ? '✓ Tersalin!' : 'Salin Semua'}
+                  </button>
+                </div>
+                <textarea
+                  readOnly
+                  value={data.encryptedSignature}
+                  className="w-full h-11 px-2 py-1 bg-slate-50 border border-slate-100 rounded text-4xs font-mono text-slate-500 resize-none focus:outline-none"
+                  title="Klik tombol salin di atas untuk menyalin semua"
+                />
+              </div>
+            </div>
           </div>
         )}
       </div>

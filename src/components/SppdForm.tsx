@@ -44,7 +44,18 @@ export default function SppdForm({ onSave, onCancel, initialData, pejabatList = 
   const [signaturePin, setSignaturePin] = useState('');
   const [pinError, setPinError] = useState('');
 
-  // Auto-fill penandatangan fields from registered list
+  // Extra fields for Luar Daerah
+  const [tipePerjalanan, setTipePerjalanan] = useState<'Luar Daerah' | 'Dalam Daerah'>(initialData?.tipePerjalanan || 'Luar Daerah');
+  const [indeksBulan, setIndeksBulan] = useState(initialData?.indeksBulan || '06');
+  const [indeksTahun, setIndeksTahun] = useState(initialData?.indeksTahun || '2026');
+  const [nomorUrutPetugas, setNomorUrutPetugas] = useState(initialData?.nomorUrutPetugas || '1');
+  const [kodeRup, setKodeRup] = useState(initialData?.kodeRup || '40186842');
+  const [sumberPembiayaan, setSumberPembiayaan] = useState(initialData?.sumberPembiayaan || 'DAU');
+  const [pejabatTtdSptType, setPejabatTtdSptType] = useState(initialData?.pejabatTtdSptType || '1');
+  const [pejabatTtdSpdType, setPejabatTtdSpdType] = useState(initialData?.pejabatTtdSpdType || '1');
+  const [pejabatTtdSpdPulangType, setPejabatTtdSpdPulangType] = useState(initialData?.pejabatTtdSpdPulangType || '1');
+
+  // Auto-fill penandatangan fields from registered list or dynamic defaults
   useEffect(() => {
     if (selectedPejabatId) {
       if (selectedPejabatId === 'manual') {
@@ -54,12 +65,53 @@ export default function SppdForm({ onSave, onCancel, initialData, pejabatList = 
         if (found) {
           setPenandatanganNama(found.nama);
           setPenandatanganPangkat(found.pangkatGol || 'Pembina Utama Muda');
-          setPenandatanganNip(found.nip.startsWith('NIP.') ? found.nip : `NIP. ${found.nip}`);
+          setPenandatanganNip(found.nip ? (found.nip.startsWith('NIP.') ? found.nip : `NIP. ${found.nip}`) : '');
           setPinError('');
+          return;
         }
       }
     }
-  }, [selectedPejabatId, pejabatList]);
+
+    // Dynamic fallback based on roles and titles
+    let searchKeywords: string[] = [];
+    let defaultVal = {
+      nama: 'SYARIFUDIN IBRAHIM, ST',
+      pangkat: 'Pembina Utama Muda - IV/c',
+      nip: '19681102 199703 1 008'
+    };
+
+    const type = pejabatTtdSpdType || '1';
+    if (type === '2') {
+      searchKeywords = ['sekretaris'];
+      defaultVal = {
+        nama: 'ANSELMUS MERE, SE',
+        pangkat: 'Pembina Tk.I - IV/b',
+        nip: '19740413 200901 1 001'
+      };
+    } else {
+      searchKeywords = ['kepala dinas', 'kadis'];
+      defaultVal = {
+        nama: 'SYARIFUDIN IBRAHIM, ST',
+        pangkat: 'Pembina Utama Muda - IV/c',
+        nip: '19681102 199703 1 008'
+      };
+    }
+
+    const found = pejabatList.find(p => 
+      p.status === 'Aktif' && 
+      searchKeywords.some(kw => p.jabatan?.toLowerCase().includes(kw))
+    );
+
+    if (found) {
+      setPenandatanganNama(found.nama);
+      setPenandatanganPangkat(found.pangkatGol || '');
+      setPenandatanganNip(found.nip ? (found.nip.startsWith('NIP.') ? found.nip : `NIP. ${found.nip}`) : '');
+    } else {
+      setPenandatanganNama(defaultVal.nama);
+      setPenandatanganPangkat(defaultVal.pangkat);
+      setPenandatanganNip(defaultVal.nip ? (defaultVal.nip.startsWith('NIP.') ? defaultVal.nip : `NIP. ${defaultVal.nip}`) : '');
+    }
+  }, [selectedPejabatId, pejabatTtdSpdType, pejabatList]);
 
   // Pengikut
   const [pengikut, setPengikut] = useState<Pengikut[]>(initialData?.pengikut || []);
@@ -69,9 +121,55 @@ export default function SppdForm({ onSave, onCancel, initialData, pejabatList = 
     if (!nomor) {
       const year = new Date().getFullYear();
       const rand = Math.floor(100 + Math.random() * 900);
-      setNomor(`000.1.2.3/DPUPR-NGK/${rand}/06/${year}`);
+      if (tipePerjalanan === 'Dalam Daerah') {
+        setNomor(`000.1.2.3/DPUPR-NGK/${rand}/04/${year}`);
+      } else {
+        setNomor(`000.1.2.3/BU-NGK/${rand}/06/${year}`);
+      }
     }
-  }, [nomor]);
+  }, [nomor, tipePerjalanan]);
+
+  const isFirstRender = React.useRef(true);
+  useEffect(() => {
+    if (isFirstRender.current) {
+      isFirstRender.current = false;
+      return;
+    }
+    const year = new Date().getFullYear();
+    const rand = Math.floor(100 + Math.random() * 900);
+    
+    if (tipePerjalanan === 'Dalam Daerah') {
+      setMaksudPerjalanan('Dalam rangka mengantar Kepala Dinas Pekerjaan Umum dan Penataan Ruang Kabupaten Nagekeo mengikuti kegiatan Musrenbangcam di Kecamatan Keo Tengah, Kecamatan Mauponggo dan Kecamtan Boawae');
+      setAlatAngkutan('Kendaraan Roda Dua');
+      setTempatTujuan('Kec.Keo Tengah, Kec. Mauponggo dan Kec. Boawae');
+      setIndeksBulan('04');
+      setIndeksTahun(year.toString());
+      setNomorUrutPetugas('59 orang ke 1, 61 orang ke 2');
+      setKodeRup('40186842');
+      setSumberPembiayaan('Bagian Laba yang Dibagikan kepada Pemerintah Daerah (Dividen) atas Penyertaan Modal pada Perusahaan Milik Daerah/BUMD');
+      setPejabatTtdSptType('2'); // Default to Sekretaris
+      setPejabatTtdSpdType('2');
+      setPejabatTtdSpdPulangType('2');
+      setNomor(`000.1.2.3/DPUPR-NGK/${rand}/04/${year}`);
+      setPembebananAkun('1.03.12.2.03.04.5.1.02.04.01.0003');
+      setPembebananSumberDana('Bagian Laba (Dividen) BUMD');
+    } else {
+      setMaksudPerjalanan('Undangan Verifikasi dan Validasi Usulan Penanganan Jalan Daerah melalui Skema Inpres Nomor 11 Tahun 2025');
+      setAlatAngkutan('Pesawat Terbang, PP');
+      setTempatTujuan('Jakarta, PP');
+      setIndeksBulan('06');
+      setIndeksTahun(year.toString());
+      setNomorUrutPetugas('1');
+      setKodeRup('40186842');
+      setSumberPembiayaan('DAU');
+      setPejabatTtdSptType('1');
+      setPejabatTtdSpdType('1');
+      setPejabatTtdSpdPulangType('1');
+      setNomor(`000.1.2.3/BU-NGK/${rand}/06/${year}`);
+      setPembebananAkun('1.03.10.2.01.5.1.02.04.001.00003');
+      setPembebananSumberDana('DAU / DAK');
+    }
+  }, [tipePerjalanan]);
 
   // Auto-calculate travel duration in days
   useEffect(() => {
@@ -172,6 +270,17 @@ export default function SppdForm({ onSave, onCancel, initialData, pejabatList = 
       penandatanganNip,
       createdAt: initialData?.createdAt || new Date().toISOString(),
       syncStatus: initialData?.syncStatus || 'pending',
+      
+      // Save extra fields
+      tipePerjalanan,
+      indeksBulan,
+      indeksTahun,
+      nomorUrutPetugas,
+      kodeRup,
+      sumberPembiayaan,
+      pejabatTtdSptType,
+      pejabatTtdSpdType,
+      pejabatTtdSpdPulangType,
     };
 
     // Calculate document integrity hash
@@ -204,9 +313,205 @@ export default function SppdForm({ onSave, onCancel, initialData, pejabatList = 
 
   return (
     <form onSubmit={handleSubmit} className="bg-white p-4 sm:p-8 rounded-xl shadow-md border border-gray-100 max-w-3xl mx-auto space-y-6" id="sppd-creation-form">
-      <div className="border-b border-gray-100 pb-4">
-        <h3 className="text-xl font-bold text-gray-900">Buat / Edit Surat Perjalanan Dinas (SPD)</h3>
-        <p className="text-sm text-gray-500 mt-1">Isi formulir dengan lengkap untuk mendaftarkan digital signature SPPD secara terenkripsi.</p>
+      <div className="border-b border-gray-100 pb-4 flex flex-col md:flex-row md:items-center md:justify-between gap-4">
+        <div>
+          <h3 className="text-xl font-bold text-gray-900">Buat / Edit Surat Perjalanan Dinas (SPD)</h3>
+          <p className="text-sm text-gray-500 mt-1">Isi formulir dengan lengkap untuk mendaftarkan digital signature SPPD secara terenkripsi.</p>
+        </div>
+        
+        {/* Tipe Perjalanan Switcher */}
+        <div className="flex bg-slate-100 p-1.5 rounded-xl border border-slate-200 self-start md:self-auto">
+          <button
+            type="button"
+            onClick={() => setTipePerjalanan('Luar Daerah')}
+            className={`px-4 py-2 rounded-lg text-xs font-bold transition cursor-pointer ${
+              tipePerjalanan === 'Luar Daerah'
+                ? 'bg-indigo-600 text-white shadow-xs'
+                : 'text-slate-600 hover:text-slate-900'
+            }`}
+          >
+            ✈️ Luar Daerah
+          </button>
+          <button
+            type="button"
+            onClick={() => setTipePerjalanan('Dalam Daerah')}
+            className={`px-4 py-2 rounded-lg text-xs font-bold transition cursor-pointer ${
+              tipePerjalanan === 'Dalam Daerah'
+                ? 'bg-indigo-600 text-white shadow-xs'
+                : 'text-slate-600 hover:text-slate-900'
+            }`}
+          >
+            🚗 Dalam Daerah
+          </button>
+        </div>
+      </div>
+
+      {/* Specific Form Section (Styled matching Page 2 "FORMAT ISIAN SPT SPD") */}
+      <div className={`p-4 sm:p-6 rounded-2xl space-y-4 border ${
+        tipePerjalanan === 'Dalam Daerah'
+          ? 'bg-emerald-50/40 border-emerald-100'
+          : 'bg-orange-50/40 border-orange-100'
+      }`}>
+        <div className={`flex items-center gap-2 border-b pb-2 ${
+          tipePerjalanan === 'Dalam Daerah' ? 'border-emerald-100' : 'border-orange-100'
+        }`}>
+          <span className="text-lg">📋</span>
+          <h4 className={`text-sm font-extrabold uppercase tracking-wider ${
+            tipePerjalanan === 'Dalam Daerah' ? 'text-emerald-950' : 'text-orange-950'
+          }`}>
+            Format Isian SPT & SPD {tipePerjalanan}
+          </h4>
+        </div>
+
+        <div className="grid grid-cols-1 md:grid-cols-3 gap-4">
+          {/* Indeks Surat */}
+          <div className="md:col-span-1">
+            <label className={`block text-3xs font-extrabold uppercase tracking-wider mb-1 ${
+              tipePerjalanan === 'Dalam Daerah' ? 'text-emerald-900' : 'text-orange-900'
+            }`}>Indeks Bulan & Tahun</label>
+            <div className="grid grid-cols-2 gap-2">
+              <input
+                type="text"
+                value={indeksBulan}
+                onChange={(e) => setIndeksBulan(e.target.value)}
+                placeholder="Bulan"
+                className={`w-full px-3 py-1.5 border rounded-lg text-xs bg-white ${
+                  tipePerjalanan === 'Dalam Daerah'
+                    ? 'border-emerald-200 focus:ring-emerald-500 focus:border-emerald-500'
+                    : 'border-orange-200 focus:ring-orange-500 focus:border-orange-500'
+                }`}
+                id="input-sppd-indeks-bulan"
+              />
+              <input
+                type="text"
+                value={indeksTahun}
+                onChange={(e) => setIndeksTahun(e.target.value)}
+                placeholder="Tahun"
+                className={`w-full px-3 py-1.5 border rounded-lg text-xs bg-white ${
+                  tipePerjalanan === 'Dalam Daerah'
+                    ? 'border-emerald-200 focus:ring-emerald-500 focus:border-emerald-500'
+                    : 'border-orange-200 focus:ring-orange-500 focus:border-orange-500'
+                }`}
+                id="input-sppd-indeks-tahun"
+              />
+            </div>
+          </div>
+
+          {/* Nomor Urut Petugas */}
+          <div>
+            <label className={`block text-3xs font-extrabold uppercase tracking-wider mb-1 ${
+              tipePerjalanan === 'Dalam Daerah' ? 'text-emerald-900' : 'text-orange-900'
+            }`}>Nomor Urut Petugas</label>
+            <input
+              type="text"
+              value={nomorUrutPetugas}
+              onChange={(e) => setNomorUrutPetugas(e.target.value)}
+              placeholder="Contoh: 1 orang ke 1"
+              className={`w-full px-3 py-1.5 border rounded-lg text-xs bg-white font-medium ${
+                tipePerjalanan === 'Dalam Daerah'
+                  ? 'border-emerald-200 focus:ring-emerald-500 focus:border-emerald-500'
+                  : 'border-orange-200 focus:ring-orange-500 focus:border-orange-500'
+              }`}
+              id="input-sppd-no-urut"
+            />
+          </div>
+
+          {/* Kode RUP */}
+          <div>
+            <label className={`block text-3xs font-extrabold uppercase tracking-wider mb-1 ${
+              tipePerjalanan === 'Dalam Daerah' ? 'text-emerald-900' : 'text-orange-900'
+            }`}>Kode RUP</label>
+            <input
+              type="text"
+              value={kodeRup}
+              onChange={(e) => setKodeRup(e.target.value)}
+              placeholder="Contoh: 40186842"
+              className={`w-full px-3 py-1.5 border rounded-lg text-xs bg-white font-mono ${
+                tipePerjalanan === 'Dalam Daerah'
+                  ? 'border-emerald-200 focus:ring-emerald-500 focus:border-emerald-500'
+                  : 'border-orange-200 focus:ring-orange-500 focus:border-orange-500'
+              }`}
+              id="input-sppd-kode-rup"
+            />
+          </div>
+        </div>
+
+        <div className={`grid grid-cols-1 md:grid-cols-3 gap-4 border-t pt-3 ${
+          tipePerjalanan === 'Dalam Daerah' ? 'border-emerald-100/50' : 'border-orange-100/50'
+        }`}>
+          {/* Pejabat Ttd SPT */}
+          <div>
+            <label className={`block text-3xs font-extrabold uppercase tracking-wider mb-1 ${
+              tipePerjalanan === 'Dalam Daerah' ? 'text-emerald-900' : 'text-orange-900'
+            }`}>Penandatangan SPT</label>
+            <select
+              value={pejabatTtdSptType}
+              onChange={(e) => setPejabatTtdSptType(e.target.value)}
+              className={`w-full px-3 py-1.5 border rounded-lg text-xs bg-white font-medium ${
+                tipePerjalanan === 'Dalam Daerah'
+                  ? 'border-emerald-200 focus:ring-emerald-500 focus:border-emerald-500'
+                  : 'border-orange-200 focus:ring-orange-500 focus:border-orange-500'
+              }`}
+              id="select-spt-ttd"
+            >
+              {tipePerjalanan === 'Dalam Daerah' ? (
+                <>
+                  <option value="1">1 : KEPALA DINAS</option>
+                  <option value="2">2 : SEKRETARIS</option>
+                </>
+              ) : (
+                <>
+                  <option value="1">1 : BUPATI</option>
+                  <option value="2">2 : WAKIL BUPATI</option>
+                  <option value="3">3 : SEKDA</option>
+                  <option value="4">4 : ASISTEN 1</option>
+                  <option value="5">5 : ASISTEN 2</option>
+                  <option value="6">6 : ASISTEN 3</option>
+                </>
+              )}
+            </select>
+          </div>
+
+          {/* Pejabat Ttd SPD */}
+          <div>
+            <label className={`block text-3xs font-extrabold uppercase tracking-wider mb-1 ${
+              tipePerjalanan === 'Dalam Daerah' ? 'text-emerald-900' : 'text-orange-900'
+            }`}>Penandatangan SPD</label>
+            <select
+              value={pejabatTtdSpdType}
+              onChange={(e) => setPejabatTtdSpdType(e.target.value)}
+              className={`w-full px-3 py-1.5 border rounded-lg text-xs bg-white font-medium ${
+                tipePerjalanan === 'Dalam Daerah'
+                  ? 'border-emerald-200 focus:ring-emerald-500 focus:border-emerald-500'
+                  : 'border-orange-200 focus:ring-orange-500 focus:border-orange-500'
+              }`}
+              id="select-spd-ttd"
+            >
+              <option value="1">1 : KEPALA DINAS</option>
+              <option value="2">2 : SEKRETARIS</option>
+            </select>
+          </div>
+
+          {/* Pejabat Ttd SPD Pulang */}
+          <div>
+            <label className={`block text-3xs font-extrabold uppercase tracking-wider mb-1 ${
+              tipePerjalanan === 'Dalam Daerah' ? 'text-emerald-900' : 'text-orange-900'
+            }`}>Penandatangan SPD Pulang</label>
+            <select
+              value={pejabatTtdSpdPulangType}
+              onChange={(e) => setPejabatTtdSpdPulangType(e.target.value)}
+              className={`w-full px-3 py-1.5 border rounded-lg text-xs bg-white font-medium ${
+                tipePerjalanan === 'Dalam Daerah'
+                  ? 'border-emerald-200 focus:ring-emerald-500 focus:border-emerald-500'
+                  : 'border-orange-200 focus:ring-orange-500 focus:border-orange-500'
+              }`}
+              id="select-spd-pulang-ttd"
+            >
+              <option value="1">1 : KEPALA DINAS</option>
+              <option value="2">2 : SEKRETARIS</option>
+            </select>
+          </div>
+        </div>
       </div>
 
       <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
